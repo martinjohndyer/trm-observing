@@ -82,12 +82,13 @@ class Ephemeris (object):
 
 class Sdata (object):
     """
-    Stores positional and ephemeris data on a star.
+    Stores positional, ephemeris and line weight data on a star.
     """
-    def __init__(self, ra, dec, ephem):
+    def __init__(self, ra, dec, ephem, lweight):
         self.ra  = ra
         self.dec = dec
         self.eph = ephem
+        self.lw  = lweight
 
 class Switch (object):
     """

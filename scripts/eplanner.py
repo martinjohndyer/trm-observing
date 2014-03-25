@@ -81,16 +81,18 @@ for line in args.stardata:
         if not line.startswith('#') and not line.isspace():
             count += 1
             if count == 1:
-                name = line.strip()
+                arr  = line.split('|')
+                name = arr[0].strip()
+                lw   = 1 if len(arr) == 1 else int(arr[1])
             elif count == 2:
                 ra,dec,system = subs.str2radec(line.strip())
             elif count == 3:
                 try:
                     eph = observing.Ephemeris(line)
-                    peinfo[name] = observing.Sdata(ra, dec, eph)
+                    peinfo[name] = observing.Sdata(ra, dec, eph, lw)
                 except:
                     print 'No valid ephemeris data found for',name
-                    peinfo[name] = Sdata(ra, dec, None)
+                    peinfo[name] = observing.Sdata(ra, dec, None, lw)
                 count = 0
     except Exception, err:
         print err
@@ -493,6 +495,7 @@ pgswin(0,1,0,1)
 pgsch(args.csize)
 for i,key in enumerate(keys):
     y = (len(peinfo)-i)/float(len(peinfo)+1)
+    pgslw(peinfo[key].lw)
     pgptxt(0.,(len(peinfo)-i)/float(len(peinfo)+1),0,0,key)
 
 pgclos()
