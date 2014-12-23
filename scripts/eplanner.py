@@ -108,7 +108,6 @@ for line in args.stardata:
 args.stardata.close()
 print 'Data on',len(peinfo),'stars loaded.'
 
-
 # Load phase ranges
 prinfo = {}
 count = 0
@@ -331,7 +330,7 @@ for i, key in enumerate(keys):
     y    = ys[key]
 
     # Compute airmasses etc for all points
-    airmasses, alts, azs, ha, pa, delz = \
+    airmasses, alts, azs, has, pa, delz = \
         sla.amass(mjds,longit,latit,height,star.ra,star.dec)
 
     start = True
@@ -372,9 +371,10 @@ for i, key in enumerate(keys):
             pgsch(0.7*args.csize)
             pgptxt(utc_start-0.2,y,0,1.0,key)
 
+        ok = (mjds > mjd_start) & (mjds < mjd_end)
+
         if tel == 'TNT':
-            # TNT specific
-            ok = (mjds > mjd_start) & (mjds < mjd_end)
+            # TNT specific, first for the aerial
             start = True
             end   = False
             air_start, air_end = utc_end, utc_start
@@ -400,9 +400,32 @@ for i, key in enumerate(keys):
                 pgsci(1)
                 pgrect(air_start,air_end,y-0.01,y+0.01)
 
+            # then for close to zenith
+            start = True
+            end   = False
+            air_start, air_end = utc_end, utc_start
+            for alt, utc in zip(alts[ok], utcs[ok]):
+                if start and alt > 88.:
+                    air_start = utc
+                    air_end   = utc_end
+                    start     = False
+
+                if not start and not end and alt < 88.:
+                    air_end = utc
+                    end     = True
+                    break
+
+            if air_start < air_end:
+                pgsci(9)
+                pgsfs(1)
+                pgrect(air_start,air_end,y-0.01,y+0.01)
+                pgsfs(2)
+                pgsls(1)
+                pgsci(1)
+                pgrect(air_start,air_end,y-0.01,y+0.01)
+
         elif tel == 'VLT':
             # VLT specific
-            ok = (mjds > mjd_start) & (mjds < mjd_end)
             start = True
             end   = False
             air_start, air_end = utc_end, utc_start
@@ -425,7 +448,6 @@ for i, key in enumerate(keys):
                 pgsls(1)
                 pgsci(1)
                 pgrect(air_start,air_end,y-0.01,y+0.01)
-
 
         # Compute phase info
         tt,tdb,btdb_start,hutc_start,htdb,vhel,vbar = \
@@ -486,6 +508,17 @@ for i, key in enumerate(keys):
                             pgslw(lw)
                             pgmove(ut1, y)
                             pgdraw(ut2, y)
+
+        # draw vertical bar at meridian
+        hamin, hamax = has[ok].min(), has[ok].max()
+        if hamin < 0 and hamax > 0.:
+            has = np.abs(has[ok])
+            utc_mer = utcs[ok][has.argmin()]
+            pgslw(4)
+            pgsci(1)
+            pgmove(utc_mer, y-1.3*lbar)
+            pgdraw(utc_mer, y+1.3*lbar)
+            pgslw(1)
 
 # add target names at left
 pgslw(1)
