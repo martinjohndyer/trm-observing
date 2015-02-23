@@ -162,7 +162,7 @@ else:
     print 'No target switches loaded.'
 
 # Estimate the maximum length of the names
-left = max([len(n) for n in prinfo.keys()])
+left = max([len(n) for n in peinfo.keys()])
 
 # Rather primitive times to define sun down and up; won't work
 # properly in far north or south or around the dateline
@@ -449,6 +449,31 @@ for i, key in enumerate(keys):
                 pgsci(1)
                 pgrect(air_start,air_end,y-0.01,y+0.01)
 
+        elif tel == 'WHT':
+            # WHT specific
+            start = True
+            end   = False
+            air_start, air_end = utc_end, utc_start
+            for alt, utc in zip(alts[ok], utcs[ok]):
+                if start and alt > 87.:
+                    air_start = utc
+                    air_end   = utc_end
+                    start     = False
+
+                if not start and not end and alt < 87.:
+                    air_end = utc
+                    end     = True
+                    break
+
+            if air_start < air_end:
+                pgsci(9)
+                pgsfs(1)
+                pgrect(air_start,air_end,y-0.01,y+0.01)
+                pgsfs(2)
+                pgsls(1)
+                pgsci(1)
+                pgrect(air_start,air_end,y-0.01,y+0.01)
+
         # Compute phase info
         tt,tdb,btdb_start,hutc_start,htdb,vhel,vbar = \
             sla.utc2tdb(mjd_start,longit,latit,height,star.ra,star.dec)
@@ -508,6 +533,18 @@ for i, key in enumerate(keys):
                             pgslw(lw)
                             pgmove(ut1, y)
                             pgdraw(ut2, y)
+            else:
+                # in case of an ephemeris with no phase ranges
+                # put an indicator of phase zero
+                d1 = np.ceil(pstart)
+                d2 = np.floor(pend)
+                nphs = int(np.ceil(d2 - d1))+1
+                for n in range(nphs):
+                    ut = utc_start + (utc_end-utc_start)*(d1 + n - pstart)/(pend-pstart)
+                    pgsci(1)
+                    pgslw(3)
+                    pgsch(1)
+                    pgpt1(ut, y, 17)
 
         # draw vertical bar at meridian
         hamin, hamax = has[ok].min(), has[ok].max()
