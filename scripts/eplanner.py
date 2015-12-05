@@ -58,6 +58,10 @@ parser.add_argument('-f', dest='fudge', type=float, default=0.55,
 parser.add_argument('-o', dest='offset', type=float, default=0.2,
                    help='offset as fraction of plot width at which to print duplicate names.')
 
+parser.add_argument('-p', dest='prefix', type=argparse.FileType('r'),
+                    default=None,
+                    help='target name prefixes. These are placed before the left-hand list of target names to allow one to add e.g. priorities.')
+
 parser.add_argument('-s', dest='switch', type=argparse.FileType('r'), default=None,
                    help='switch targets data file. Each line should have the format:\nstar name | start switch time (e.g. 12:34) | dead time\nwhere the dead time is the time taken (in minutes) to make the switch. The line will be split on the pipe | characters which must therefore not appear in the star name. Use a star name = None as the final switch to terminate early. The times should increase monotonically, so use times > 24 if necessary.')
 
@@ -108,7 +112,7 @@ for line in args.stardata:
 args.stardata.close()
 print 'Data on',len(peinfo),'stars loaded.'
 
-# Load phase ranges
+# Load phase / time ranges
 prinfo = {}
 count = 0
 for line in args.pranges:
@@ -126,13 +130,8 @@ for line in args.pranges:
                 name = line.strip()
                 pr   = observing.Prange(name)
             elif count > 1:
-                p1, p2, col, lw = line.split()
-                p1  = float(p1)
-                p2  = float(p2)
-                p2  = p2 - m.floor(p2-p1)
-                col = int(col)
-                lw  = int(lw)
-                pr.prange.append([p1, p2, col, lw])
+                pr.add(line)
+
     except ValueError:
         print 'ValueError found in',line
         exit(1)
@@ -161,8 +160,34 @@ if args.switch is not None:
 else:
     print 'No target switches loaded.'
 
-# Estimate the maximum length of the names
-left = max([len(n) for n in peinfo.keys()])
+# Load prefixes
+prefixes = {}
+if args.prefix is not None:
+    first = True
+    for line in args.prefix:
+        if not line.startswith('#') and not line.isspace():
+            if first:
+                name = line.strip()
+                if name not in peinfo:
+                    print 'Prefix target =',name,'not found in peinfo'
+                first = False
+            else:
+                prefixes[name] = line.strip()
+                first = True
+    args.prefix.close()
+    print len(prefixes),'target prefixes loaded.'
+else:
+    print 'No target prefixes loaded.'
+
+# Compute maximum length of the names
+if len(prefixes):
+    mpre = max([len(n) for n in prefixes.values()]) + 1
+else:
+    mpre = 0
+
+left = max([len(n) for n in peinfo.keys()]) + mpre
+
+# Compute maximum length of the names
 
 # Rather primitive times to define sun down and up; won't work
 # properly in far north or south or around the dateline
@@ -279,6 +304,7 @@ pgsch(1.5)
 pglab('UTC',' ',args.date + ' (' + args.telescope + ', airmass < ' + \
       str(args.airmass) + ')')
 
+# 400 points from start to end
 utcs = np.linspace(utc5,utc6,400)
 mjds = isun + utcs/24.
 mjd6 = isun+utc6/24.
@@ -376,22 +402,31 @@ for i, key in enumerate(keys):
         if tel == 'TNT':
             # TNT specific, first for the aerial
             start = True
-            end   = False
-            air_start, air_end = utc_end, utc_start
+            aerial = []
             for alt,az,utc in zip(alts[ok],azs[ok],utcs[ok]):
                 if az < 0.: az += 360.
 
-                if start and observing.tnt_alert(alt, az):
-                    air_start = utc
-                    air_end   = utc_end
-                    start     = False
+                if observing.tnt_alert(alt, az):
+                    if start:
+                        # start bad period
+                        air_start = utc
+                        air_end   = utc
+                        start     = False
+                    else:
+                        # update end time of bad period
+                        air_end = utc
+                else:
+                    if not start:
+                        # We are out of it. Record bad period.
+                        aerial.append((air_start,air_end))
+                        start = True
 
-                if not start and not end and not observing.tnt_alert(alt, az):
-                    air_end = utc
-                    end     = True
-                    break
+            if not start:
+                # We were still in a bad period at the end. Record it.
+                aerial.append((air_start,air_end))
 
-            if air_start < air_end:
+            # Plots the bad periods
+            for air_start, air_end in aerial:
                 pgsci(9)
                 pgsfs(1)
                 pgrect(air_start,air_end,y-0.01,y+0.01)
@@ -481,6 +516,24 @@ for i, key in enumerate(keys):
         tt,tdb,btdb_end,hutc_end,htdb,vhel,vbar = \
             sla.utc2tdb(mjd_end,longit,latit,height,star.ra,star.dec)
 
+        if key in prinfo:
+            # handles the time ranges only
+            pr   = prinfo[key]
+
+            pgsls(1)
+            pranges = pr.prange
+            for p1, p2, col, lw, p_or_t in pranges:
+                if p_or_t == 'Time':
+                    utc1, utc2 = 24.*(p1-isun), 24.*(p2-isun)
+                    if utc1 < utc_end and utc2 > utc_start:
+                        ut1  = max(utc1, utc_start)
+                        ut2  = min(utc2, utc_end)
+                        if ut1 < ut2:
+                            pgsci(col)
+                            pgslw(lw)
+                            pgmove(ut1, y)
+                            pgdraw(ut2, y)
+
         if star.eph:
             eph = star.eph
 
@@ -518,33 +571,34 @@ for i, key in enumerate(keys):
                 # Draw phase ranges of interest
                 pgsls(1)
                 pranges = pr.prange
-                for p1, p2, col, lw in pranges:
-                    d1    = pstart + (p1 - pstart) % 1 - 1
-                    d2    = pend   + (p1 - pend) % 1
-                    nphs  = int(np.ceil(d2 - d1))
-                    for n in range(nphs):
-                        ut1  = utc_start + (utc_end-utc_start)*\
-                               (d1 + n - pstart)/(pend-pstart)
-                        ut2  = ut1 + (utc_end-utc_start)/(pend-pstart)*(p2-p1)
-                        ut1  = max(ut1, utc_start)
-                        ut2  = min(ut2, utc_end)
-                        if ut1 < ut2:
-                            pgsci(col)
-                            pgslw(lw)
-                            pgmove(ut1, y)
-                            pgdraw(ut2, y)
-            else:
-                # in case of an ephemeris with no phase ranges
-                # put an indicator of phase zero
-                d1 = np.ceil(pstart)
-                d2 = np.floor(pend)
-                nphs = int(np.ceil(d2 - d1))+1
-                for n in range(nphs):
-                    ut = utc_start + (utc_end-utc_start)*(d1 + n - pstart)/(pend-pstart)
-                    pgsci(1)
-                    pgslw(3)
-                    pgsch(1)
-                    pgpt1(ut, y, 17)
+                for p1, p2, col, lw, p_or_t in pranges:
+                    if p_or_t == 'Phase':
+                        d1    = pstart + (p1 - pstart) % 1 - 1
+                        d2    = pend   + (p1 - pend) % 1
+                        nphs  = int(np.ceil(d2 - d1))
+                        for n in range(nphs):
+                            ut1  = utc_start + (utc_end-utc_start)*\
+                                (d1 + n - pstart)/(pend-pstart)
+                            ut2  = ut1 + (utc_end-utc_start)/(pend-pstart)*(p2-p1)
+                            ut1  = max(ut1, utc_start)
+                            ut2  = min(ut2, utc_end)
+                            if ut1 < ut2:
+                                pgsci(col)
+                                pgslw(lw)
+                                pgmove(ut1, y)
+                                pgdraw(ut2, y)
+
+            # draws dots at phase zero
+            d1 = np.ceil(pstart)
+            d2 = np.floor(pend)
+            nphs = int(np.ceil(d2 - d1))+1
+            for n in range(nphs):
+                ut = utc_start + (utc_end-utc_start)*(d1 + n - pstart)/(pend-pstart)
+                pgsci(1)
+                pgslw(3)
+                pgsch(1)
+                pgpt1(ut, y, 17)
+
 
         # draw vertical bar at meridian
         hamin, hamax = has[ok].min(), has[ok].max()
@@ -565,8 +619,15 @@ pgswin(0,1,0,1)
 pgsch(args.csize)
 for i,key in enumerate(keys):
     y = (len(peinfo)-i)/float(len(peinfo)+1)
+    if key in prefixes:
+        name = prefixes[key] + ' ' + key
+    elif len(prefixes):
+        name = mpre*' ' + key
+    else:
+        name = key
+
     pgslw(peinfo[key].lw)
-    pgptxt(0.,(len(peinfo)-i)/float(len(peinfo)+1),0,0,key)
+    pgptxt(0.,(len(peinfo)-i)/float(len(peinfo)+1),0,0,name)
 
 pgclos()
 
