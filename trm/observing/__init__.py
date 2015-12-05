@@ -108,11 +108,32 @@ class Switch (object):
 
 class Prange(object):
     """
-    Stores phase range data
+    Stores phase or time range data
+    Very little to this class.
     """
     def __init__(self, name):
         self.name   = name
         self.prange = []
+
+    def add(self, line):
+        """
+        Given a line of information with 4 components,
+        a phase or time range, a pgpplot colour index and a line
+        width, this stores the parameters in a an internal list
+        prange. Distinguish phase from time (JD) by > or < 1000.
+        """
+        p1, p2, col, lw = line.split()
+        p1  = float(p1)
+        p2  = float(p2)
+        if p1 < 1000.:
+            p2  = p2 - m.floor(p2-p1)
+            p_or_t = 'Phase'
+        else:
+            p_or_t = 'Time'
+
+        col = int(col)
+        lw  = int(lw)
+        self.prange.append([p1, p2, col, lw, p_or_t])
 
 def tnt_alert(alt, az):
     """
