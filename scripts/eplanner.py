@@ -90,6 +90,7 @@ for line in args.stardata:
                 lw   = 1 if len(arr) == 1 else int(arr[1])
             elif count == 2:
                 ra,dec,system = subs.str2radec(line.strip())
+                print ra,dec,system
             elif count == 3:
                 try:
                     eph = observing.Ephemeris(line)
@@ -484,8 +485,8 @@ for i, key in enumerate(keys):
                 pgsci(1)
                 pgrect(air_start,air_end,y-0.01,y+0.01)
 
-        elif tel == 'WHT':
-            # WHT specific
+        elif tel == 'WHT' or tel == 'NTT':
+            # WHT / NTT specific
             start = True
             end   = False
             air_start, air_end = utc_end, utc_start
