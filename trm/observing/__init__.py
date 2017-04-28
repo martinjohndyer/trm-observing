@@ -11,8 +11,17 @@ import numpy as np
 from trm import subs
 
 from astropy import time, coordinates as coord, units as u
-from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
+from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz, SkyCoord
 from astropy.time import TimeISO
+
+class Sdata (object):
+    """
+    Stores positional, ephemeris and line weight data on a star.
+    """
+    def __init__(self, position, ephem, lweight):
+        self.position = position
+        self.eph = ephem
+        self.lw = lweight
 
 class Ephemeris (object):
     """
@@ -92,9 +101,14 @@ def load_pos_eph(fname):
     02:00:52.17 -09:24:31.7
     null
 
-    Gaia14aae
+    Gaia14aae | 2
     16:11:33.97 +63:08:31.81
     BMJD linear 56980.0557197 0.0000013 0.034519487 0.000000016
+
+    The position can be given in any form accepted by
+    astropy.coordinates.SkyCoord wbut with the RA and Dec specified in
+    sexagesimal form. The "| 2" on the second one is an option to increase the
+    line weight
 
     """
     peinfo = {}
@@ -108,18 +122,18 @@ def load_pos_eph(fname):
                 if not line.startswith('#') and not line.isspace():
                     count += 1
                     if count == 1:
-                        arr  = line.split('|')
+                        arr = line.split('|')
                         name = arr[0].strip()
-                        lw   = 1 if len(arr) == 1 else int(arr[1])
+                        lw = 1 if len(arr) == 1 else int(arr[1])
                     elif count == 2:
-                        ra,dec = line.split()
+                        position = SkyCoord(line.strip(), unit=(u.hourangle, u.deg))
                     elif count == 3:
                         try:
                             eph = Ephemeris(line)
-                            peinfo[name] = Sdata(ra, dec, eph, lw)
+                            peinfo[name] = Sdata(position, eph, lw)
                         except:
                             print('No valid ephemeris data found for',name)
-                            peinfo[name] = Sdata(ra, dec, None, lw)
+                            peinfo[name] = Sdata(position, None, lw)
                         count = 0
             except Exception as err:
                 print(err)
@@ -134,16 +148,6 @@ def load_pos_eph(fname):
 
     print('Data on',len(peinfo),'stars loaded.')
     return peinfo
-
-class Sdata (object):
-    """
-    Stores positional, ephemeris and line weight data on a star.
-    """
-    def __init__(self, ra, dec, ephem, lweight):
-        self.ra = ra
-        self.dec = dec
-        self.eph = ephem
-        self.lw = lweight
 
 class Switch (object):
     """
