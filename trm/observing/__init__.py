@@ -10,6 +10,10 @@ import math as m
 import numpy as np
 from trm import subs
 
+from astropy import time, coordinates as coord, units as u
+from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
+from astropy.time import TimeISO
+
 class Ephemeris (object):
     """
     Stores an ephemeris.
@@ -79,16 +83,67 @@ class Ephemeris (object):
             fac  *= cycle**2
         return m.sqrt(esum)
 
+def load_pos_eph(fname):
+    """
+    Loads positional / ephemeris data from a file, returns in the form of a
+    dictionary keyed by the target names. File has following format::
+
+    ES Cet
+    02:00:52.17 -09:24:31.7
+    null
+
+    Gaia14aae
+    16:11:33.97 +63:08:31.81
+    BMJD linear 56980.0557197 0.0000013 0.034519487 0.000000016
+
+    """
+    peinfo = {}
+    count = 0
+    nline = 0
+    name  = None
+    with open(fname) as fin:
+        for line in fin:
+            nline += 1
+            try:
+                if not line.startswith('#') and not line.isspace():
+                    count += 1
+                    if count == 1:
+                        arr  = line.split('|')
+                        name = arr[0].strip()
+                        lw   = 1 if len(arr) == 1 else int(arr[1])
+                    elif count == 2:
+                        ra,dec = line.split()
+                    elif count == 3:
+                        try:
+                            eph = Ephemeris(line)
+                            peinfo[name] = Sdata(ra, dec, eph, lw)
+                        except:
+                            print('No valid ephemeris data found for',name)
+                            peinfo[name] = Sdata(ra, dec, None, lw)
+                        count = 0
+            except Exception as err:
+                print(err)
+                print('Line number',nline)
+                print('Line =',line.strip())
+                if name:
+                    print('Name = ' + name)
+                else:
+                    print('Name undefined')
+                    print('Program aborted.')
+                exit(1)
+
+    print('Data on',len(peinfo),'stars loaded.')
+    return peinfo
 
 class Sdata (object):
     """
     Stores positional, ephemeris and line weight data on a star.
     """
     def __init__(self, ra, dec, ephem, lweight):
-        self.ra  = ra
+        self.ra = ra
         self.dec = dec
         self.eph = ephem
-        self.lw  = lweight
+        self.lw = lweight
 
 class Switch (object):
     """
@@ -105,6 +160,30 @@ class Switch (object):
             utc += float(utv[2])/3600.
         self.utc   = utc
         self.delta = float(delta)/60.
+
+def load_switches(fname, peinfo):
+    swinfo = []
+    if fname is not None:
+        first = True
+        with open(fname) as fin:
+            for line in fin:
+                if not line.startswith('#') and not line.isspace():
+                    swinfo.append(Switch(line))
+                    if swinfo[-1].name != 'None' and swinfo[-1].name not in peinfo:
+                        raise Exception('switch star: ' + swinfo[-1].name + \
+                                        ' not found in position/ephemeris file.')
+                    if first:
+                        utold = swinfo[-1].utc
+                    else:
+                        utnew = swinfo[-1].utc
+                        if utnew < utold:
+                            raise Exception('switch: times not increasing.')
+                        utold = utnew
+        print(len(swinfo),'target switches loaded.')
+    else:
+        print('No target switches loaded.')
+
+    return swinfo
 
 class Prange(object):
     """
@@ -134,6 +213,35 @@ class Prange(object):
         col = int(col)
         lw  = int(lw)
         self.prange.append([p1, p2, col, lw, p_or_t])
+
+def load_ptranges(fname, peinfo):
+    # Load phase / time ranges
+    count = 0
+    prinfo = {}
+    with open(fname) as fin:
+        for line in fin:
+            try:
+                if line.startswith('#') or line.isspace():
+                    if count:
+                        if name in peinfo:
+                            prinfo[name] = pr
+                        else:
+                            print(name,'not found in position/ephemeris file and will be skipped.')
+                        count = 0
+                else:
+                    count += 1
+                    if count == 1:
+                        name = line.strip()
+                        pr = Prange(name)
+                    elif count > 1:
+                        pr.add(line)
+
+            except ValueError:
+                print('ValueError found in',line)
+                exit(1)
+
+    print('Data on',len(prinfo),'phase ranges loaded.')
+    return prinfo
 
 def tnt_alert(alt, az):
     """
@@ -169,4 +277,86 @@ def tnt_alert(alt, az):
     v = subs.Vec3(m.sin(raz)*m.cos(ralt), m.cos(raz)*m.cos(ralt), m.sin(ralt))
 
     return subs.dot(a1,v) > 0 and subs.dot(a2,v) > 0
+
+def load_prefixes(fname, peinfo):
+    prefixes = {}
+    if fname is not None:
+        first = True
+        with open(fname) as fin:
+            for line in fin:
+                if not line.startswith('#') and not line.isspace():
+                    if first:
+                        name = line.strip()
+                        if name not in peinfo:
+                            print('Prefix target =',name,'not found in peinfo')
+                        first = False
+                    else:
+                        prefixes[name] = line.strip()
+                        first = True
+        print(len(prefixes),'target prefixes loaded.')
+    else:
+        print('No target prefixes loaded.')
+    return prefixes
+
+
+def sun_at_alt(time1, time2, site, alt, tol=0.05):
+    """
+    Given two astropy.time.Time values that bracket the times when the Sun is 
+    at altitude "alt" degrees, this returns the astropy.time.Time when it equals
+    alt to with "tol" degrees. If the times do not bracket alt, the
+    routine raises an Exception. The times should be close enough that there is only one
+    crossing point, but this will not be checked.
+
+    Arguments::
+
+        time1 : (astropy.time.Time)
+             first time when the Sun's altitude is either > or < alt
+
+        time2 : (astropy.time.Time)
+             second time when the Sun's altitude is either < or > alt
+
+        site : (astropy.coordinates.EarthLocation)
+             the position of the observing site.
+
+        alt : (float)
+             the altitude of interest in degrees
+
+        tol : (float)
+             tolerance of the altitude in degrees
+    """
+
+    altazframe1 = AltAz(obstime=time1, location=site)
+    sunaltaz1 = get_sun(time1).transform_to(altazframe1)
+
+    altazframe2 = AltAz(obstime=time2, location=site)
+    sunaltaz2 = get_sun(time2).transform_to(altazframe2)
+
+    if (sunaltaz1.alt.value < alt and sunaltaz2.alt.value < alt) or \
+            (sunaltaz1.alt.value > alt and sunaltaz2.alt.value > alt):
+        raise Exception('sun_at_alt: times do no bracket the Sun crossing altitude = ' + str(alt))
+
+    if sunaltaz1.alt.value < alt:
+        rising = True
+    else:
+        rising  = False
+
+    # check if we are close enough already (unlikely)
+    if abs(sunaltaz2.alt.value-sunaltaz1.alt.value) < tol:
+        return time1
+
+    # otherwise, binary chop
+    while abs(sunaltaz2.alt.value-sunaltaz1.alt.value) > tol:
+        tmid = time.Time((time1.mjd+time2.mjd)/2.,format='mjd')
+        altazframe = AltAz(obstime=tmid, location=site)
+        sunaltaz = get_sun(tmid).transform_to(altazframe)
+
+        if (sunaltaz.alt.value < alt and rising) or (sunaltaz.alt.value > alt and not rising):
+            sunaltaz1 = sunaltaz
+            time1 = tmid
+        else:
+            sunaltaz2 = sunaltaz
+            time2 = tmid
+
+    return tmid
+
 
