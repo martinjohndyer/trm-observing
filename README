@@ -1,5 +1,6 @@
 trm.observing is a minimal package that is all about one script,
-"eplanner.py". It requires trm.subs and trm.sla to be available.
+"eplanner.py". It requires trm.subs to be available and used astropy
+and matplotlib. 
 
 eplanner provides a visual representation of the times of eclipses
 and visibility periods of multiple targets. 
@@ -10,5 +11,5 @@ python setup.py install --prefix=<installation directory>
 
 with the last part optional if you are root.
 
-
-Tom Marsh, 09 Dec 2015
+2017-04-30: has undergone extensive changes which will only work under python3
+and now require astropy and matplotlib rather than sla and pgplot.

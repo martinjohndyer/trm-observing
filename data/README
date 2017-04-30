@@ -6,9 +6,9 @@ targets.swi -- an example switch file
 
 Then the commands:
 
-eplanner.py targets.lis TNT targets.prg "20 Jan 2015"
+eplanner.py targets.lis TNT targets.prg 2015-01-20
 
-eplanner.py targets.lis TNT targets.prg "20 Jan 2015" -s targets.swi
+eplanner.py targets.lis TNT targets.prg 2015-01-20 -s targets.swi
 
 should make plots of the observable times for each star, particular phases,
 when they are close to the meridian, when they pass behind the aerial (in the
@@ -16,3 +16,4 @@ case of the Doi Inthanon telescope). The switch file allows you to overplot an
 observational plan for the night.
 
 Type 'eplanner -h' for a list of the available options.
+
