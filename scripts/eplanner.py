@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '-c', dest='csize', type=float, default=1.0,
-        help='default character size for star names.')
+        help='default character size for star names')
 
     parser.add_argument(
         '-a', dest='airmass', type=float, default=2,
@@ -98,6 +98,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '--bfrac', type=float, default=0.1,
         help='offset of bottom of plot as fraction of total')
+
+    parser.add_argument(
+        '--xmajor', type=float, default=2,
+        help='spacing of labelled major ticks in X')
+
+    parser.add_argument(
+        '--xminor', type=float, default=1,
+        help='spacing of minor ticks in X')
 
     parser.add_argument(
         '-p', dest='prefix', default=None,
@@ -226,23 +234,28 @@ if __name__ == '__main__':
     utc5 = 24.*(rset.mjd-isun)
     utc6 = 24.*(rrise.mjd-isun)
 
-    # set up general scale, draw vertical dashed lines every hour
-    utstart = utc1 - 0.4
-    utend = utc2 + 0.4
+    # set up general scale, draw vertical dashed lines every minor 
+    # tick spacing
+    utstart = utc1 - 0.5
+    utend = utc2 + 0.5
 
-    n1 = int(np.ceil(utc1))
-    n2 = int(np.ceil(utc2))
+    n1 = int(np.ceil(utc1/args.xminor))
+    n2 = int(np.ceil(utc2/args.xminor))
 
     for n in range(n1,n2):
-        axr.plot([n,n],[0,1],'--',color=cols[5])
+        axr.plot([n*args.xminor,n*args.xminor],[0,1],'--',color=cols[5])
 
     # mark sunset / twiset / twirise / sunrise
-    kwargs = {'color' : cols[2], 'horizontalalignment' : 'center'}
+
+    # first labels
+    kwargs = {'color' : cols[2], 'ha' : 'center', 'va' : 'center', 
+              'size' : 10}
     axr.text(utc1, 1.02, 'sunset', **kwargs)
     axr.text(utc2, 1.02, 'sunrise', **kwargs)
     axr.text(utc3, 1.02, str(args.twilight), **kwargs)
     axr.text(utc4, 1.02, str(args.twilight), **kwargs)
 
+    # the vertical lines
     kwargs = {'color' : cols[2]}
     axr.plot([utc1,utc1],[0,1],'--',**kwargs)
     axr.plot([utc2,utc2],[0,1],'--',**kwargs)
@@ -286,11 +299,11 @@ if __name__ == '__main__':
                 first = False
             else:
                 if sw.name == 'None':
-                    plt.plot([xstart,sw.utc],[ystart,ystart],**kwargs)
+                    axr.plot([xstart,sw.utc],[ystart,ystart],**kwargs)
                     break
                 else:
                     xend, yend = sw.utc+sw.delta, ys[sw.name]
-                    plt.plot([xstart, sw.utc, xend],[ystart, ystart, yend],**kwargs)
+                    axr.plot([xstart, sw.utc, xend],[ystart, ystart, yend],**kwargs)
                     xstart, ystart = xend, yend
 
 
@@ -319,10 +332,10 @@ if __name__ == '__main__':
                     afirst = False
             elif not flag and not first:
                 first = True
-                plt.plot([ut_start,utc],[y,y],'k--')
+                axr.plot([ut_start,utc],[y,y],'k--')
                 lbar = min(0.01, 1./len(keys)/4.)
-                plt.plot([ut_start,ut_start],[y-lbar,y+lbar],'k')
-                plt.plot([utc,utc],[y-lbar,y+lbar],'k')
+                axr.plot([ut_start,ut_start],[y-lbar,y+lbar],'k')
+                axr.plot([utc,utc],[y-lbar,y+lbar],'k')
                 mjd_last = mjd
                 utc_last = utc
 
@@ -330,7 +343,7 @@ if __name__ == '__main__':
                     # repeat target name if the start is delayed to make it easier to line up
                     # names and tracks
                     kwargs = {'ha' : 'right', 'va' : 'center', 'size' : int(10*args.csize)}
-                    plt.text(ut_start-0.2, y, key, **kwargs)
+                    axr.text(ut_start-0.2, y, key, **kwargs)
 
         # Now some telescope-specific stuff (zenith holes, aerial at TNT)
         if args.telescope == 'TNT':
@@ -361,9 +374,9 @@ if __name__ == '__main__':
 
             # Plot the bad periods
             for air_start, air_end in aerial:
-                plt.fill([air_start,air_end,air_end,air_start],
+                axr.fill([air_start,air_end,air_end,air_start],
                          [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
-                plt.plot([air_start,air_end,air_end,air_start,air_start],
+                axr.plot([air_start,air_end,air_end,air_start,air_start],
                          [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
 
             # then for close to zenith
@@ -377,9 +390,9 @@ if __name__ == '__main__':
                     break
 
             if not start:
-                plt.fill([air_start,air_end,air_end,air_start],
+                axr.fill([air_start,air_end,air_end,air_start],
                          [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
-                plt.plot([air_start,air_end,air_end,air_start,air_start],
+                axr.plot([air_start,air_end,air_end,air_start,air_start],
                          [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
 
         elif args.telescope == 'VLT':
@@ -496,15 +509,15 @@ if __name__ == '__main__':
                     plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2)
 
     # finish off
-    plt.xlabel('UTC')
+    axr.set_xlabel('UTC')
     plt.title('Night starting {0!s} at the {1:s}, airmass < {2:3.1f}'.format(
             date, args.telescope, args.airmass))
 
     plt.xlim(utstart, utend)
     plt.ylim(0,1.05)
 
-    axr.xaxis.set_major_locator(MultipleLocator(2))
-    axr.xaxis.set_minor_locator(MultipleLocator(1))
+    axr.xaxis.set_major_locator(MultipleLocator(args.xmajor))
+    axr.xaxis.set_minor_locator(MultipleLocator(args.xminor))
     axr.get_xaxis().tick_bottom()
     axr.axes.get_yaxis().set_visible(False)
 
