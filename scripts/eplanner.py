@@ -28,6 +28,7 @@ import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib.ticker import MultipleLocator
 from astropy import time, coordinates as coord, units as u
 from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
@@ -201,11 +202,12 @@ if __name__ == '__main__':
     }
 
     # Start the plot
-    fig = plt.figure(figsize=(args.width,args.height))
+    fig = plt.figure(figsize=(args.width,args.height),facecolor='white')
 
     # left and right axes. Left for labels, right for the main stuff
     axl = plt.axes([0.01, args.bfrac, args.divide, args.hfrac])
-    axr = plt.axes([args.divide, args.bfrac, 0.99-args.divide, args.hfrac])
+    axr = plt.axes([args.divide, args.bfrac, 0.99-args.divide, args.hfrac],
+                   frameon=False)
 
     # sunrise / sunset
     utc1 = 24.*(sunset.mjd-isun)
@@ -504,7 +506,7 @@ if __name__ == '__main__':
     axr.xaxis.set_major_locator(MultipleLocator(2))
     axr.xaxis.set_minor_locator(MultipleLocator(1))
     axr.get_xaxis().tick_bottom()
-    axr.get_yaxis().set_visible(False)
+    axr.axes.get_yaxis().set_visible(False)
 
     # Modify hours labels so that all lie in the range [1,24]
     fig.canvas.draw()
@@ -528,10 +530,18 @@ if __name__ == '__main__':
             name = mpre*' ' + key
         else:
             name = key
-        axl.text(1,y,name,ha='right',va='center',size=int(12*args.csize))
+        axl.text(0.95,y,name,ha='right',va='center',size=int(12*args.csize))
     axl.set_xlim(0,1)
     axl.set_ylim(0,1.05)
     axl.set_axis_off()
+
+    xmin, xmax = axr.get_xaxis().get_view_interval()
+    ymin, ymax = axr.get_yaxis().get_view_interval()
+    axr.add_artist(
+        Line2D((xmin, xmax), (ymin, ymin), color='black',
+               linewidth=2))
+
+
 #        pgslw(peinfo[key].lw)
 
     if args.hcopy:
