@@ -398,7 +398,7 @@ if __name__ == '__main__':
             continue
 
         if moon_close:
-            axr.text(utc_last+0.05, y,
+            axr.text(utc_last+0.07, y,
                      '${:d}^\circ$'.format(int(round(sepmin))),
                      ha='left', va='center', size=9*args.csize,
                      color=cols[2])
@@ -538,7 +538,7 @@ if __name__ == '__main__':
                 for p1, p2, col, lw, p_or_t in pranges:
                     if p_or_t == 'Phase':
                         d1 = pstart + (p1 - pstart) % 1 - 1
-                        d2 = pend   + (p1 - pend) % 1
+                        d2 = pend + (p1 - pend) % 1
                         nphs = int(np.ceil(d2 - d1))
                         for n in range(nphs):
                             ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
@@ -554,7 +554,7 @@ if __name__ == '__main__':
                 nphs = int(np.ceil(d2 - d1))+1
                 for n in range(nphs):
                     ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
-                    plt.plot(ut,y,'ok')
+                    plt.plot(ut,y,'ok',ms=4)
 
             # draw vertical bar at meridian
             if ok.any():
@@ -568,11 +568,11 @@ if __name__ == '__main__':
 
     # finish off
     axr.set_xlabel('UTC')
-    plt.title('{0!s} ({1:s}, airmass < {2:3.1f})'.format(
-            date, args.telescope, args.airmass))
+    axr.set_title('{0!s} ({1:s}, airmass < {2:3.1f})'.format(
+        date, args.telescope, args.airmass))
 
-    plt.xlim(utstart, utend)
-    plt.ylim(0,1.05)
+    axr.set_xlim(utstart, utend)
+    axr.set_ylim(0,1.05)
 
     axr.xaxis.set_major_locator(MultipleLocator(args.xmajor))
     axr.xaxis.set_minor_locator(MultipleLocator(args.xminor))
@@ -615,5 +615,3 @@ if __name__ == '__main__':
         plt.savefig(args.hcopy)
     else:
         plt.show()
-
-
