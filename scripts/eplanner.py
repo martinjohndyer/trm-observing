@@ -22,6 +22,10 @@ may not appear when you expect.
 Grey boxes represent zenith holes for Alt/Az telescopes. Some like the VLT
 can't track close to the zenith, and you may not be able to observe during
 these intervals.
+
+A curved, red dashed line represents the elevation of the Moon. An indication of
+its illuminated percentage is written at the top and its minimum separation from
+targets is indicated it is below a user-defined minimum.
 """
 import argparse
 import datetime
@@ -73,26 +77,26 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '-t', dest='twilight', type=float, default=-15,
-        help='how many degrees below horizon for twilight.')
+        help='altitude of Sun for twilight [degrees]')
 
     parser.add_argument(
         '-m', dest='mdist', type=float, default=20,
-        help='limit in degrees below which to highlight that the Moon is close')
+        help='separation below which to highlight that the Moon gets close [degrees]')
 
     parser.add_argument(
         '-c', dest='csize', type=float, default=1.0,
         help='default character size for star names')
 
     parser.add_argument(
-        '-a', dest='airmass', type=float, default=2,
+        '-a', dest='airmass', type=float, default=2.2,
         help='airmass limit.')
 
     parser.add_argument(
-        '-o', dest='offset', type=float, default=0.25,
+        '-o', dest='offset', type=float, default=0.3,
         help='offset as fraction of plot width at which to print duplicate names.')
 
     parser.add_argument(
-        '-d', dest='divide', type=float, default=0.2,
+        '-d', dest='divide', type=float, default=0.25,
         help='divide point between names on left and plot on right as fraction of total width')
 
     parser.add_argument(
@@ -105,11 +109,11 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--xmajor', type=float, default=2,
-        help='spacing of labelled major ticks in X')
+        help='spacing of labelled major ticks in X [hours]')
 
     parser.add_argument(
         '--xminor', type=float, default=1,
-        help='spacing of minor ticks in X')
+        help='spacing of minor ticks in X [hours]')
 
     parser.add_argument(
         '-p', dest='prefix', default=None,
@@ -335,12 +339,16 @@ if __name__ == '__main__':
 
         # Compute minimum distance to the Moon during period target
         # is above airmass limit
-        sepmin = np.min((star.position.separation(moon)).degree[ok])
-        moon_close = sepmin < args.mdist
-        if moon_close:
-            col = cols[2]
+        seps = (star.position.separation(moon)).degree[ok]
+        if len(seps):
+            sepmin = seps.min()
+            moon_close = sepmin < args.mdist
+            if moon_close:
+                col = cols[2]
+            else:
+                col = 'k'
         else:
-            col = 'k'
+            moon_close = False
 
 
         first = True
@@ -366,7 +374,7 @@ if __name__ == '__main__':
                     # repeat target name if the start is delayed to make it
                     # easier to line up names and tracks
                     kwargs = {'ha' : 'right', 'va' : 'center',
-                              'size' : 10*args.csize}
+                              'size' : 9*args.csize}
                     axr.text(ut_start-0.2, y, key, **kwargs)
 
         if flag and not first:
@@ -382,7 +390,7 @@ if __name__ == '__main__':
                 # repeat target name if the start is delayed to make it
                 # easier to line up names and tracks
                 kwargs = {'ha' : 'right', 'va' : 'center',
-                          'size' : 10*args.csize}
+                          'size' : 9*args.csize}
                 axr.text(ut_start-0.2, y, key, **kwargs)
 
         if afirst:
@@ -392,7 +400,7 @@ if __name__ == '__main__':
         if moon_close:
             axr.text(utc_last+0.05, y,
                      '${:d}^\circ$'.format(int(round(sepmin))),
-                     ha='left', va='center', size=10*args.csize,
+                     ha='left', va='center', size=9*args.csize,
                      color=cols[2])
 
         # Now some telescope-specific stuff (zenith holes, aerial at TNT)
@@ -584,7 +592,6 @@ if __name__ == '__main__':
 
 
     # add target names at left
-#    pgsch(args.csize)
     for key in keys:
         y = ys[key]
         if key in prefixes:
@@ -593,7 +600,7 @@ if __name__ == '__main__':
             name = mpre*' ' + key
         else:
             name = key
-        axl.text(0.95,y,name,ha='right',va='center',size=int(12*args.csize))
+        axl.text(0.95,y,name,ha='right',va='center',size=9*args.csize)
     axl.set_xlim(0,1)
     axl.set_ylim(0,1.05)
     axl.set_axis_off()
@@ -603,9 +610,6 @@ if __name__ == '__main__':
     axr.add_artist(
         Line2D((xmin, xmax), (ymin, ymin), color='black',
                linewidth=2))
-
-
-#        pgslw(peinfo[key].lw)
 
     if args.hcopy:
         plt.savefig(args.hcopy)
