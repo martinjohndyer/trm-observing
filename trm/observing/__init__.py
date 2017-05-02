@@ -303,13 +303,12 @@ def load_prefixes(fname, peinfo):
     return prefixes
 
 
-def sun_at_alt(time1, time2, site, alt, tol=0.05):
-    """
-    Given two astropy.time.Time values that bracket the times when the Sun is 
-    at altitude "alt" degrees, this returns the astropy.time.Time when it equals
-    alt to with "tol" degrees. If the times do not bracket alt, the
-    routine raises an Exception. The times should be close enough that there is only one
-    crossing point, but this will not be checked.
+def sun_at_alt(time1, time2, site, alt, tol=0.05, ftol=10.):
+    """Given two astropy.time.Time values that bracket the times when the Sun is
+    at altitude "alt" degrees, this returns the astropy.time.Time when it
+    equals alt to with "tol" degrees. If the times do not bracket alt, the
+    routine raises an Exception. The times should be close enough that there
+    is only one crossing point, but this will not be checked.
 
     Arguments::
 
@@ -327,13 +326,18 @@ def sun_at_alt(time1, time2, site, alt, tol=0.05):
 
         tol : (float)
              tolerance of the altitude in degrees
+
+        ftol : (float)
+             once limits on altitude get less than this, don't refresh the
+             Sun's position (for speed)
     """
 
     altazframe1 = AltAz(obstime=time1, location=site)
     sunaltaz1 = get_sun(time1).transform_to(altazframe1)
 
     altazframe2 = AltAz(obstime=time2, location=site)
-    sunaltaz2 = get_sun(time2).transform_to(altazframe2)
+    sun = get_sun(time2)
+    sunaltaz2 = sun.transform_to(altazframe2)
 
     if (sunaltaz1.alt.value < alt and sunaltaz2.alt.value < alt) or \
             (sunaltaz1.alt.value > alt and sunaltaz2.alt.value > alt):
@@ -352,7 +356,9 @@ def sun_at_alt(time1, time2, site, alt, tol=0.05):
     while abs(sunaltaz2.alt.value-sunaltaz1.alt.value) > tol:
         tmid = time.Time((time1.mjd+time2.mjd)/2.,format='mjd')
         altazframe = AltAz(obstime=tmid, location=site)
-        sunaltaz = get_sun(tmid).transform_to(altazframe)
+        if abs(sunaltaz2.alt.value-sunaltaz1.alt.value) > ftol:
+            sun = get_sun(tmid)
+        sunaltaz = sun.transform_to(altazframe)
 
         if (sunaltaz.alt.value < alt and rising) or (sunaltaz.alt.value > alt and not rising):
             sunaltaz1 = sunaltaz
@@ -362,5 +368,4 @@ def sun_at_alt(time1, time2, site, alt, tol=0.05):
             time2 = tmid
 
     return tmid
-
 

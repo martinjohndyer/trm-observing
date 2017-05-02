@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # arguments
     parser = argparse.ArgumentParser(
-        description=usage, 
+        description=usage,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # positional
@@ -76,6 +76,10 @@ if __name__ == '__main__':
         help='how many degrees below horizon for twilight.')
 
     parser.add_argument(
+        '-m', dest='mdist', type=float, default=20,
+        help='limit in degrees below which to highlight that the Moon is close')
+
+    parser.add_argument(
         '-c', dest='csize', type=float, default=1.0,
         help='default character size for star names')
 
@@ -84,7 +88,7 @@ if __name__ == '__main__':
         help='airmass limit.')
 
     parser.add_argument(
-        '-o', dest='offset', type=float, default=0.2,
+        '-o', dest='offset', type=float, default=0.25,
         help='offset as fraction of plot width at which to print duplicate names.')
 
     parser.add_argument(
@@ -180,14 +184,21 @@ if __name__ == '__main__':
     sunrise = observing.sun_at_alt(night, day2, site, -0.25)
     sunset.out_subfmt='date_hm'
     sunrise.out_subfmt='date_hm'
+
+    # integer offset
+    isun = int(sunset.mjd)
+    utc1 = 24.*(sunset.mjd-isun)
+    utc2 = 24.*(sunrise.mjd-isun)
     print('Sun is at alt=-0.25 at {0:s} and {1:s}'.format(sunset.iso,sunrise.iso))
 
-    # the lines in the plot will terminate at the point the Sun is at -10 as the absolute
-    # limit for observation.
+    # the lines in the plot will terminate at the point the Sun is at -10 as
+    # the absolute limit for observation.
     rset = observing.sun_at_alt(day1, night, site, -10.)
     rrise = observing.sun_at_alt(night, day2, site, -10.)
     rset.out_subfmt='date_hm'
     rrise.out_subfmt='date_hm'
+    utc5 = 24.*(rset.mjd-isun)
+    utc6 = 24.*(rrise.mjd-isun)
     print('Sun is at alt=-10.0 at {0:s} and {1:s}'.format(rset.iso,rrise.iso))
 
     # user-defined twilight -- will be indicated on the plot.
@@ -195,12 +206,11 @@ if __name__ == '__main__':
     twirise = observing.sun_at_alt(night, day2, site, args.twilight)
     twiset.out_subfmt='date_hm'
     twirise.out_subfmt='date_hm'
+    utc3 = 24.*(twiset.mjd-isun)
+    utc4 = 24.*(twirise.mjd-isun)
     print('Sun is at alt={0:5.1f} at {1:s} and {2:s}'.format(args.twilight,twiset.iso,twirise.iso))
 
-    # integer offset
-    isun = int(sunset.mjd)
-
-    # simulating the old PGPLOT colours
+    # simulate the old PGPLOT colours
     cols = {
         2 : (0.7,0,0),
         3 : (0,0.7,0),
@@ -217,22 +227,10 @@ if __name__ == '__main__':
     axr = plt.axes([args.divide, args.bfrac, 0.99-args.divide, args.hfrac],
                    frameon=False)
 
-    # sunrise / sunset
-    utc1 = 24.*(sunset.mjd-isun)
-    utc2 = 24.*(sunrise.mjd-isun)
-
-    # correct times to lie within range
+    # correct switch times to lie within range
     for sw in swinfo:
         if sw.utc < utc1 and sw.utc+24 < utc2:
             sw.utc += 24.
-
-    # rise / set as defined by user-defined altitude
-    utc3 = 24.*(twiset.mjd-isun)
-    utc4 = 24.*(twirise.mjd-isun)
-
-    # rise / set when at -10 which is the absolute limit I think.
-    utc5 = 24.*(rset.mjd-isun)
-    utc6 = 24.*(rrise.mjd-isun)
 
     # set up general scale, draw vertical dashed lines every minor 
     # tick spacing
@@ -247,7 +245,14 @@ if __name__ == '__main__':
 
     # mark sunset / twiset / twirise / sunrise
 
-    # first labels
+    # first with vertical lines
+    kwargs = {'color' : cols[2]}
+    axr.plot([utc1,utc1],[0,1],'--',**kwargs)
+    axr.plot([utc2,utc2],[0,1],'--',**kwargs)
+    axr.plot([utc3,utc3],[0,1],'--',**kwargs)
+    axr.plot([utc4,utc4],[0,1],'--',**kwargs)
+
+    # then labels
     kwargs = {'color' : cols[2], 'ha' : 'center', 'va' : 'center', 
               'size' : 10}
     axr.text(utc1, 1.02, 'sunset', **kwargs)
@@ -255,24 +260,28 @@ if __name__ == '__main__':
     axr.text(utc3, 1.02, str(args.twilight), **kwargs)
     axr.text(utc4, 1.02, str(args.twilight), **kwargs)
 
-    # the vertical lines
-    kwargs = {'color' : cols[2]}
-    axr.plot([utc1,utc1],[0,1],'--',**kwargs)
-    axr.plot([utc2,utc2],[0,1],'--',**kwargs)
-    axr.plot([utc3,utc3],[0,1],'--',**kwargs)
-    axr.plot([utc4,utc4],[0,1],'--',**kwargs)
-
-    # 400 points from start to end
-    mjd6 = isun+utc6/24.
+    # 400 points from start to end defined by the Sun at -10.
     utcs = np.linspace(utc5,utc6,400)
     mjds = isun + utcs/24.
     mjds = time.Time(mjds, format='mjd')
 
+    # Calculate MJD in middle of visibility period and position of Moon at
+    # this time.  Will use this to compute a representative illumination for
+    # the Moon
+    mjd_mid = time.Time(isun + (utc5+utc6)/48., format='mjd')
+    moon = get_moon(mjd_mid, location=site)
+    sun = get_sun(mjd_mid)
+    elong = sun.separation(moon)
+    mphase = np.arctan2(sun.distance*np.sin(elong),
+                        moon.distance - sun.distance*np.cos(elong))
+    illum = (1 + np.cos(mphase))/2.0
+    axr.text((utc5+utc6)/2., 1.02,
+             'Moon: {:3d}%'.format(int(round(100*illum.value))), **kwargs)
+
     # Loop through the stars listed in the ephemeris file, computing their hour
     # angles at midnight to establish the plot order
     has = []
-    midnight = time.Time((sunset.mjd+sunrise.mjd)/2.,format='mjd')
-    lst = midnight.sidereal_time(kind='mean', longitude=site.longitude)
+    lst = mjd_mid.sidereal_time(kind='mean', longitude=site.longitude)
 
     for key, star in peinfo.items():
         ha = (lst - star.position.ra).value
@@ -286,7 +295,6 @@ if __name__ == '__main__':
     ys = {}
     for i,key in enumerate(keys):
         ys[key] = (len(keys)-i)/float(len(keys)+1)
-
 
     # Plot switches
     if args.switch is not None:
@@ -306,6 +314,12 @@ if __name__ == '__main__':
                     axr.plot([xstart, sw.utc, xend],[ystart, ystart, yend],**kwargs)
                     xstart, ystart = xend, yend
 
+    # compute altitude of Moon
+    moon = get_moon(mjds, location=site)
+    altazframe = AltAz(obstime=mjds, location=site)
+    altaz = moon.transform_to(altazframe)
+    alts = altaz.alt.value
+    plt.plot(utcs,alts/90.,'--',color=cols[2])
 
     # Loop through the stars listed in the phase ranges.
     for key in keys:
@@ -313,12 +327,21 @@ if __name__ == '__main__':
         y = ys[key]
 
         # Compute airmasses for all times
-        altazframe = AltAz(obstime=mjds, location=site)
         altaz = star.position.transform_to(altazframe)
         airmasses = altaz.secz.value
         alts = altaz.alt.value
         azs = altaz.az.value
         ok = alts > 90.-np.degrees(np.arccos(1./args.airmass))
+
+        # Compute minimum distance to the Moon during period target
+        # is above airmass limit
+        sepmin = np.min((star.position.separation(moon)).degree[ok])
+        moon_close = sepmin < args.mdist
+        if moon_close:
+            col = cols[2]
+        else:
+            col = 'k'
+
 
         first = True
         afirst = True
@@ -332,18 +355,45 @@ if __name__ == '__main__':
                     afirst = False
             elif not flag and not first:
                 first = True
-                axr.plot([ut_start,utc],[y,y],'k--')
+                axr.plot([ut_start,utc],[y,y],'--',color=col)
                 lbar = min(0.01, 1./len(keys)/4.)
-                axr.plot([ut_start,ut_start],[y-lbar,y+lbar],'k')
-                axr.plot([utc,utc],[y-lbar,y+lbar],'k')
+                axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col)
+                axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
                 mjd_last = mjd
                 utc_last = utc
 
                 if ut_start > utstart + args.offset*(utend-utstart):
-                    # repeat target name if the start is delayed to make it easier to line up
-                    # names and tracks
-                    kwargs = {'ha' : 'right', 'va' : 'center', 'size' : int(10*args.csize)}
+                    # repeat target name if the start is delayed to make it
+                    # easier to line up names and tracks
+                    kwargs = {'ha' : 'right', 'va' : 'center',
+                              'size' : 10*args.csize}
                     axr.text(ut_start-0.2, y, key, **kwargs)
+
+        if flag and not first:
+            # stuff left over to plot
+            axr.plot([ut_start,utc],[y,y],'--',color=col)
+            lbar = min(0.01, 1./len(keys)/4.)
+            axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col)
+            axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
+            mjd_last = mjd
+            utc_last = utc
+
+            if ut_start > utstart + args.offset*(utend-utstart):
+                # repeat target name if the start is delayed to make it
+                # easier to line up names and tracks
+                kwargs = {'ha' : 'right', 'va' : 'center',
+                          'size' : 10*args.csize}
+                axr.text(ut_start-0.2, y, key, **kwargs)
+
+        if afirst:
+            # never found any ok bit; move on ...
+            continue
+
+        if moon_close:
+            axr.text(utc_last+0.05, y,
+                     '${:d}^\circ$'.format(int(round(sepmin))),
+                     ha='left', va='center', size=10*args.csize,
+                     color=cols[2])
 
         # Now some telescope-specific stuff (zenith holes, aerial at TNT)
         if args.telescope == 'TNT':
@@ -510,7 +560,7 @@ if __name__ == '__main__':
 
     # finish off
     axr.set_xlabel('UTC')
-    plt.title('Night starting {0!s} at the {1:s}, airmass < {2:3.1f}'.format(
+    plt.title('{0!s} ({1:s}, airmass < {2:3.1f})'.format(
             date, args.telescope, args.airmass))
 
     plt.xlim(utstart, utend)
