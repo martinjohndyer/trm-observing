@@ -303,7 +303,7 @@ def load_prefixes(fname, peinfo):
     return prefixes
 
 
-def sun_at_alt(time1, time2, site, alt, tol=0.05, ftol=10.):
+def sun_at_alt(time1, time2, site, alt, tol=0.05):
     """Given two astropy.time.Time values that bracket the times when the Sun is
     at altitude "alt" degrees, this returns the astropy.time.Time when it
     equals alt to with "tol" degrees. If the times do not bracket alt, the
@@ -326,10 +326,6 @@ def sun_at_alt(time1, time2, site, alt, tol=0.05, ftol=10.):
 
         tol : (float)
              tolerance of the altitude in degrees
-
-        ftol : (float)
-             once limits on altitude get less than this, don't refresh the
-             Sun's position (for speed)
     """
 
     altazframe1 = AltAz(obstime=time1, location=site)
@@ -356,8 +352,7 @@ def sun_at_alt(time1, time2, site, alt, tol=0.05, ftol=10.):
     while abs(sunaltaz2.alt.value-sunaltaz1.alt.value) > tol:
         tmid = time.Time((time1.mjd+time2.mjd)/2.,format='mjd')
         altazframe = AltAz(obstime=tmid, location=site)
-        if abs(sunaltaz2.alt.value-sunaltaz1.alt.value) > ftol:
-            sun = get_sun(tmid)
+        sun = get_sun(tmid)
         sunaltaz = sun.transform_to(altazframe)
 
         if (sunaltaz.alt.value < alt and rising) or (sunaltaz.alt.value > alt and not rising):
