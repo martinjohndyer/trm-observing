@@ -3,12 +3,10 @@
 from __future__ import print_function
 
 usage = \
-"""
-Plots out observing schedules for eclipsers. You supply a file of target
-positions and ephemerides, another defining the phase ranges of interest and
-optionally a third specifying when to switch targets, and this will make a
-graphical representation of the results. It also allows you to plot a line
-representing the objects you wish to observe.
+""" Plots out observing schedules, with a focus on periodic variables. You
+supply a file of target positions and ephemerides, another defining phase
+ranges of interest and optionally a third specifying when to switch targets,
+and this will make a graphical representation of the results.
 
 The tracks for the stars start and stop when the Sun is 10 degrees below the
 horizon, although that is really pushing things. Don't expect to be able to
@@ -21,7 +19,7 @@ may not appear when you expect.
 
 Grey boxes represent zenith holes for Alt/Az telescopes. Some like the VLT
 can't track close to the zenith, and you may not be able to observe during
-these intervals.
+these intervals. For the TNT there is also a special indicator of close approach to the TV mast (only approximate).
 
 A curved, red dashed line represents the elevation of the Moon. An indication of
 its illuminated percentage is written at the top and its minimum separation from
@@ -31,9 +29,11 @@ import argparse
 import datetime
 
 import numpy as np
+
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MultipleLocator
+
 from astropy import time, coordinates as coord, units as u
 from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
 
@@ -46,7 +46,6 @@ SITES = {
     'VLT' : ('-70 24 9.9', '-24 37 30.3', 2635.),
     'TNT' : ('+98 28 00', '+18 34 00',2457.),
     }
-
 
 if __name__ == '__main__':
 
@@ -96,15 +95,15 @@ if __name__ == '__main__':
         help='offset as fraction of plot width at which to print duplicate names.')
 
     parser.add_argument(
-        '-d', dest='divide', type=float, default=0.25,
+        '-d', dest='divide', type=float, default=0.18,
         help='divide point between names on left and plot on right as fraction of total width')
 
     parser.add_argument(
-        '--hfrac', type=float, default=0.8,
+        '--hfrac', type=float, default=0.84,
         help='plot height as fraction of total')
 
     parser.add_argument(
-        '--bfrac', type=float, default=0.1,
+        '--bfrac', type=float, default=0.08,
         help='offset of bottom of plot as fraction of total')
 
     parser.add_argument(
@@ -124,20 +123,21 @@ if __name__ == '__main__':
         help='switch targets data file name. Each line should have the format:\nstar name | start switch time (e.g. 12:34) | dead time\nwhere the dead time is the time taken (in minutes) to make the switch. The line will be split on the pipe | characters which must therefore not appear in the star name. Use a star name = None as the final switch to terminate early. The times should increase monotonically, so use times > 24 if necessary.')
 
     parser.add_argument(
-        '-x', dest='width', type=float, default=8,
+        '-x', dest='width', type=float, default=11.69,
         help='plot width, inches')
 
     parser.add_argument(
-        '-y', dest='height', type=float, default=5,
+        '-y', dest='height', type=float, default=8.27,
         help='plot height, inches')
 
     # parse them
     args = parser.parse_args()
 
+    # a few checks
     assert(args.airmass > 1 and args.airmass < 6)
     assert(args.width > 0 and args.height > 0)
 
-    # Interpret date
+    # Interpret date. 
     date = time.Time(args.date, out_subfmt='date')
 
     # Location
@@ -167,14 +167,12 @@ if __name__ == '__main__':
 
     left = max([len(n) for n in peinfo.keys()]) + mpre
 
-    # Rather primitive times to define Sun down and up; won't work
-    # properly in far north or south or around the dateline, but should be
-    # OK for most sites.
-
-    # 'date' is set at the UTC of the start of the entered date, i.e. 0
-    # hours. To get to the day time before the night of interest, we advance
-    # by 0.5 days and apply an offset in longitude. This should be the local
-    # mid-day, then half day steps are used to locate midnight and the
+    # Rather primitive times to bracket Sun down and up; won't work properly
+    # in far north or south or around the dateline, but should be OK for most
+    # sites.  'date' is set at the UTC of the start of the entered date,
+    # i.e. 0 hours. To get to the day time before the night of interest, we
+    # advance by 0.5 days and apply an offset in longitude. This should be the
+    # local mid-day, then half day steps are used to locate midnight and the
     # following mid day. Armed with these we can narrow down on the sunset /
     # rise etc times.
     toffset = time.TimeDelta(0.5 - site.longitude.degree/360., format='jd')
@@ -205,7 +203,7 @@ if __name__ == '__main__':
     utc6 = 24.*(rrise.mjd-isun)
     print('Sun is at alt=-10.0 at {0:s} and {1:s}'.format(rset.iso,rrise.iso))
 
-    # user-defined twilight -- will be indicated on the plot.
+    # user-defined twilight -- will be indicated on the plot with dashed lines
     twiset = observing.sun_at_alt(day1, night, site, args.twilight)
     twirise = observing.sun_at_alt(night, day2, site, args.twilight)
     twiset.out_subfmt='date_hm'
@@ -227,9 +225,10 @@ if __name__ == '__main__':
     fig = plt.figure(figsize=(args.width,args.height),facecolor='white')
 
     # left and right axes. Left for labels, right for the main stuff
-    axl = plt.axes([0.01, args.bfrac, args.divide, args.hfrac])
-    axr = plt.axes([args.divide, args.bfrac, 0.99-args.divide, args.hfrac],
-                   frameon=False)
+    edge = 0.04
+    axl = plt.axes([edge, args.bfrac, args.divide, args.hfrac])
+    axr = plt.axes([args.divide+edge, args.bfrac, 1-2*edge-args.divide,
+                    args.hfrac], frameon=False)
 
     # correct switch times to lie within range
     for sw in swinfo:
@@ -269,9 +268,9 @@ if __name__ == '__main__':
     mjds = isun + utcs/24.
     mjds = time.Time(mjds, format='mjd')
 
-    # Calculate MJD in middle of visibility period and position of Moon at
-    # this time.  Will use this to compute a representative illumination for
-    # the Moon
+    # Calculate MJD in middle of visibility period and the position of the
+    # Moon at this time in order to calculate a representative illumination
+    # for the Moon which is added at the top of the plot.
     mjd_mid = time.Time(isun + (utc5+utc6)/48., format='mjd')
     moon = get_moon(mjd_mid, location=site)
     sun = get_sun(mjd_mid)
@@ -300,7 +299,7 @@ if __name__ == '__main__':
     for i,key in enumerate(keys):
         ys[key] = (len(keys)-i)/float(len(keys)+1)
 
-    # Plot switches
+    # Plot a line to represent which target to observe
     if args.switch is not None:
         kwargs = {'color' : cols[5], 'lw' : 5}
 
@@ -318,14 +317,15 @@ if __name__ == '__main__':
                     axr.plot([xstart, sw.utc, xend],[ystart, ystart, yend],**kwargs)
                     xstart, ystart = xend, yend
 
-    # compute altitude of Moon
+    # compute altitude of Moon through the night. Add as red dashed line
+    # scaled so that 90 = top of plot.
     moon = get_moon(mjds, location=site)
     altazframe = AltAz(obstime=mjds, location=site)
     altaz = moon.transform_to(altazframe)
     alts = altaz.alt.value
     plt.plot(utcs,alts/90.,'--',color=cols[2])
 
-    # Loop through the stars listed in the phase ranges.
+    # Finally, loop through the stars listed in the phase ranges.
     for key in keys:
         star = peinfo[key]
         y = ys[key]
@@ -349,7 +349,6 @@ if __name__ == '__main__':
                 col = 'k'
         else:
             moon_close = False
-
 
         first = True
         afirst = True
@@ -556,15 +555,15 @@ if __name__ == '__main__':
                     ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
                     plt.plot(ut,y,'ok',ms=4)
 
-            # draw vertical bar at meridian
-            if ok.any():
-                lst = mjds.sidereal_time(kind='mean', longitude=site.longitude)
-                has = (lst - star.position.ra).value
-                hamin, hamax = has[ok].min(), has[ok].max()
-                if hamin < 0 and hamax > 0.:
-                    has = np.abs(has[ok])
-                    utc_mer = utcs[ok][has.argmin()]
-                    plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2)
+        # draw vertical bar at meridian crossing
+        if ok.any():
+            lst = mjds.sidereal_time(kind='mean', longitude=site.longitude)
+            has = (lst - star.position.ra).value
+            hamin, hamax = has[ok].min(), has[ok].max()
+            if hamin < 0 and hamax > 0.:
+                has = np.abs(has[ok])
+                utc_mer = utcs[ok][has.argmin()]
+                plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2)
 
     # finish off
     axr.set_xlabel('UTC')
