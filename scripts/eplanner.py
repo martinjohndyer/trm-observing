@@ -547,13 +547,13 @@ if __name__ == '__main__':
                             if ut1 < ut2:
                                 plt.plot([ut1,ut2],[y,y],color=cols[col],lw=lw)
 
-                # draws dots at phase zero
-                d1 = np.ceil(pstart)
-                d2 = np.floor(pend)
-                nphs = int(np.ceil(d2 - d1))+1
-                for n in range(nphs):
-                    ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
-                    plt.plot(ut,y,'ok',ms=4)
+            # draws dots at phase zero
+            d1 = np.ceil(pstart)
+            d2 = np.floor(pend)
+            nphs = int(np.ceil(d2 - d1))+1
+            for n in range(nphs):
+                ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
+                plt.plot(ut,y,'ok',ms=4)
 
         # draw vertical bar at meridian crossing
         if ok.any():

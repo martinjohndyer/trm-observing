@@ -68,6 +68,10 @@ class Ephemeris (object):
         else:
             raise Exception('Ephem: recognised times are HJD, BJD, HMJD or BMJD')
 
+    def __repr__(self):
+        return 'Ephemeris(time={!r}, poly={!r}, coeff={!r}, ecoeff={!r})'.format(
+            self.time,self.poly,self.coeff,self.ecoeff)
+
     def phase(self, time):
         """
         Computes phase corresponding to a given time
