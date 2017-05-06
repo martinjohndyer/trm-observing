@@ -3,27 +3,31 @@
 from __future__ import print_function
 
 usage = \
-""" Plots out observing schedules, with a focus on periodic variables. You
+""" Plots out observing schedules, with a focus on periodic events. You
 supply a file of target positions and ephemerides, another defining phase
 ranges of interest and optionally a third specifying when to switch targets,
 and this will make a graphical representation of the results.
 
-The tracks for the stars start and stop when the Sun is 10 degrees below the
-horizon, although that is really pushing things. Don't expect to be able to
-push beyond these limits or even close to them in most cases.
+The tracks for the stars start and stop when they reach a user-defined
+airmass, set to 2.2 by default, or when the Sun is 10 degrees below the
+horizon, whichever is more constraining. Sun at -10 is optimistic for most
+targets.
 
 If you see horizontal black error bars at the far right, these indicate +/- 1
 sigma uncertainties on ephemerides. As quoted uncertainties can barely ever be
 trusted, they are indicative only. If they are big, be careful: your eclipse
 may not appear when you expect.
 
-Grey boxes represent zenith holes for Alt/Az telescopes. Some like the VLT
-can't track close to the zenith, and you may not be able to observe during
-these intervals. For the TNT there is also a special indicator of close approach to the TV mast (only approximate).
+Grey boxes represent zenith holes for Alt/Az telescopes which can't track very
+close to the zenith. These are not always hard limits, but you may not be able
+to observe during these intervals. For the TNT there is also a special
+indicator of close approach to the TV mast (only approximate).
 
 A curved, red dashed line represents the elevation of the Moon. An indication of
 its illuminated percentage is written at the top and its minimum separation from
-targets is indicated it is below a user-defined minimum.
+targets is indicated if it is below a user-defined minimum.
+
+Black dots indicate phase 0 for any targets with ephemerides.
 """
 import argparse
 import datetime
@@ -39,13 +43,29 @@ from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
 
 from trm import observing
 
-# Longitude, latitude, height keyed by name
+# Longitude, latitude, height, zenith hole (deg) keyed by name
 SITES = {
-    'WHT' : ('-17 52 53.9', '+28 45 38.3', 2332.),
-    'NTT' : ('-70 44 00.', '-29 15 00.', 2400.),
-    'VLT' : ('-70 24 9.9', '-24 37 30.3', 2635.),
-    'TNT' : ('+98 28 00', '+18 34 00',2457.),
-    }
+
+    'WHT' : {
+        'long' : '-17 52 53.9', 'lat' : '+28 45 38.3',
+        'height' : 2332., 'zhole' : 3.
+    },
+
+    'NTT' : {
+        'long' : '-70 44 00.', 'lat' : '-29 15 00.', 
+        'height' : 2400., 'zhole' : 5.
+    },
+
+    'VLT' : {
+        'long' : '-70 24 9.9', 'lat' : '-24 37 30.3', 
+        'height' : 2635., 'zhole' : 4.
+    },
+
+    'TNT' : {
+        'long' : '+98 28 00', 'lat' : '+18 34 00',
+        'height' : 2457., 'zhole' : 2.
+    },
+}
 
 if __name__ == '__main__':
 
@@ -136,16 +156,16 @@ if __name__ == '__main__':
     # a few checks
     assert(args.airmass > 1 and args.airmass < 6)
     assert(args.width > 0 and args.height > 0)
+    assert(args.telescope in SITES)
 
     # Interpret date. 
     date = time.Time(args.date, out_subfmt='date')
 
     # Location
-    if args.telescope in SITES:
-        info = SITES[args.telescope]
-        site = coord.EarthLocation.from_geodetic(info[0],info[1],info[2])
-    else:
-        site = coord.EarthLocation(args.telescope)
+    info = SITES[args.telescope]
+    site = coord.EarthLocation.from_geodetic(
+        info['long'], info['lat'], info['height']
+    )
 
     # Load position and ephemeris data
     peinfo = observing.load_pos_eph(args.stardata)
@@ -263,8 +283,8 @@ if __name__ == '__main__':
     axr.text(utc3, 1.02, str(args.twilight), **kwargs)
     axr.text(utc4, 1.02, str(args.twilight), **kwargs)
 
-    # 400 points from start to end defined by the Sun at -10.
-    utcs = np.linspace(utc5,utc6,400)
+    # 1000 points from start to end defined by the Sun at -10.
+    utcs = np.linspace(utc5,utc6,1000)
     mjds = isun + utcs/24.
     mjds = time.Time(mjds, format='mjd')
 
@@ -402,9 +422,24 @@ if __name__ == '__main__':
                      ha='left', va='center', size=9*args.csize,
                      color=cols[2])
 
-        # Now some telescope-specific stuff (zenith holes, aerial at TNT)
+        # zenith holes
+        start = True
+        for alt, utc in zip(alts[ok], utcs[ok]):
+            if start and alt > 90.-info['zhole']:
+                air_start = utc
+                start = False
+            elif not start and alt < 90.-info['zhole']:
+                air_end = utc
+                break
+
+        if not start:
+            plt.fill([air_start,air_end,air_end,air_start],
+                     [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
+            plt.plot([air_start,air_end,air_end,air_start,air_start],
+                     [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
+
+        # TNT has a stupid TV aerial
         if args.telescope == 'TNT':
-            # TNT specific, first for the aerial
             start = True
             aerial = []
             for alt,az,utc in zip(alts[ok],azs[ok],utcs[ok]):
@@ -435,57 +470,6 @@ if __name__ == '__main__':
                          [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
                 axr.plot([air_start,air_end,air_end,air_start,air_start],
                          [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
-
-            # then for close to zenith
-            start = True
-            for alt, utc in zip(alts[ok], utcs[ok]):
-                if start and alt > 88.:
-                    air_start = utc
-                    start     = False
-                elif not start and alt < 88.:
-                    air_end = utc
-                    break
-
-            if not start:
-                axr.fill([air_start,air_end,air_end,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
-                axr.plot([air_start,air_end,air_end,air_start,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
-
-        elif args.telescope == 'VLT':
-            # VLT specific
-            start = True
-            for alt, utc in zip(alts[ok], utcs[ok]):
-                if start and alt > 86.:
-                    air_start = utc
-                    start = False
-                elif not start and alt < 86.:
-                    air_end = utc
-                    break
-
-            if not start:
-                plt.fill([air_start,air_end,air_end,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
-                plt.plot([air_start,air_end,air_end,air_start,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
-
-        elif args.telescope == 'WHT' or args.telescope == 'NTT':
-            # WHT / NTT specific
-            start = True
-            for alt, utc in zip(alts[ok], utcs[ok]):
-                if start and alt > 88.:
-                    air_start = utc
-                    start     = False
-                elif not start and alt < 87.:
-                    air_end = utc
-                    break
-
-            if not start:
-                plt.fill([air_start,air_end,air_end,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
-                plt.plot([air_start,air_end,air_end,air_start,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
-
 
         if key in prinfo:
             # handles the time ranges only
