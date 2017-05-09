@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(name='trm.observing',
       version='0.5',
       packages = ['trm', 'trm.observing'],
-      scripts=['scripts/eplanner.py', 'scripts/ltphaseii.py'],
+      scripts=['scripts/eplanner.py', ],
 
       # metadata
       author='Tom Marsh',
