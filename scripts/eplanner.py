@@ -195,7 +195,7 @@ if __name__ == '__main__':
     # local mid-day, then half day steps are used to locate midnight and the
     # following mid day. Armed with these we can narrow down on the sunset /
     # rise etc times.
-    toffset = time.TimeDelta(0.5 - site.longitude.degree/360., format='jd')
+    toffset = time.TimeDelta(0.5 - site.lon.degree/360., format='jd')
 
     day1  = date + toffset
     night = day1 + time.TimeDelta(0.5, format='jd')
@@ -292,6 +292,7 @@ if __name__ == '__main__':
     # Moon at this time in order to calculate a representative illumination
     # for the Moon which is added at the top of the plot.
     mjd_mid = time.Time(isun + (utc5+utc6)/48., format='mjd')
+
     moon = get_moon(mjd_mid, location=site)
     sun = get_sun(mjd_mid)
     elong = sun.separation(moon)
@@ -304,7 +305,7 @@ if __name__ == '__main__':
     # Loop through the stars listed in the ephemeris file, computing their hour
     # angles at midnight to establish the plot order
     has = []
-    lst = mjd_mid.sidereal_time(kind='mean', longitude=site.longitude)
+    lst = mjd_mid.sidereal_time(kind='mean', longitude=site.lon)
 
     for key, star in peinfo.items():
         ha = (lst - star.position.ra).value
@@ -541,7 +542,7 @@ if __name__ == '__main__':
 
         # draw vertical bar at meridian crossing
         if ok.any():
-            lst = mjds.sidereal_time(kind='mean', longitude=site.longitude)
+            lst = mjds.sidereal_time(kind='mean', longitude=site.lon)
             has = (lst - star.position.ra).value
             hamin, hamax = has[ok].min(), has[ok].max()
             if hamin < 0 and hamax > 0.:
