@@ -36,7 +36,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MultipleLocator, FuncFormatter
 
 from astropy import time, coordinates as coord, units as u
 from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
@@ -66,6 +66,15 @@ SITES = {
         'height' : 2457., 'zhole' : 2.
     },
 }
+
+def utc_formatter(x, pos):
+    """
+    Make sure UTC labels are always in range 1-24
+    """
+    if int(x) > 24:
+        x -= 24
+    return '{:d}'.format(int(x))
+
 
 if __name__ == '__main__':
 
@@ -560,20 +569,10 @@ if __name__ == '__main__':
 
     axr.xaxis.set_major_locator(MultipleLocator(args.xmajor))
     axr.xaxis.set_minor_locator(MultipleLocator(args.xminor))
+    axr.xaxis.set_major_formatter(FuncFormatter(utc_formatter))
     axr.get_xaxis().tick_bottom()
     axr.axes.get_yaxis().set_visible(False)
-
-    # Modify hours labels so that all lie in the range [1,24]
     fig.canvas.draw()
-    labels = [item.get_text() for item in axr.get_xticklabels()]
-    for i in range(len(labels)):
-        try:
-            if int(labels[i]) > 24:
-                labels[i] = str(int(labels[i])-24)
-        except:
-            pass
-    axr.set_xticklabels(labels)
-
 
     # add target names at left
     for key in keys:
