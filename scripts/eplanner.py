@@ -360,7 +360,7 @@ if __name__ == '__main__':
 
         # Compute minimum distance to the Moon during period target
         # is above airmass limit
-        seps = (star.position.separation(moon)).degree[ok]
+        seps = moon.separation(star.position).degree[ok]
         if len(seps):
             sepmin = seps.min()
             moon_close = sepmin < args.mdist
