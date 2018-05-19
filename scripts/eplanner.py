@@ -51,6 +51,11 @@ SITES = {
         'height' : 2332., 'zhole' : 3.
     },
 
+    'GTC' : {
+        'long' : '-17 53 31', 'lat' : '+28 45 24',
+        'height' : 2300., 'zhole' : 8.
+    },
+
     'NTT' : {
         'long' : '-70 44 00.', 'lat' : '-29 15 00.', 
         'height' : 2400., 'zhole' : 5.
