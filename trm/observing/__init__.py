@@ -14,6 +14,40 @@ from astropy import time, coordinates as coord, units as u
 from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz, SkyCoord
 from astropy.time import TimeISO
 
+# Longitude, latitude, height, zenith hole (deg) keyed by name
+SITES = {
+
+    'WHT' : {
+        'long' : '-17 52 53.9', 'lat' : '+28 45 38.3',
+        'height' : 2332., 'zhole' : 3.
+    },
+
+    'GTC' : {
+        'long' : '-17 53 31', 'lat' : '+28 45 24',
+        'height' : 2300., 'zhole' : 8.
+    },
+
+    'NTT' : {
+        'long' : '-70 44 00.', 'lat' : '-29 15 00.', 
+        'height' : 2400., 'zhole' : 5.
+    },
+
+    'VLT' : {
+        'long' : '-70 24 9.9', 'lat' : '-24 37 30.3', 
+        'height' : 2635., 'zhole' : 4.
+    },
+
+    'TNT' : {
+        'long' : '+98 28 00', 'lat' : '+18 34 00',
+        'height' : 2457., 'zhole' : 2.
+    },
+
+    'A2.3' : {
+        'long' : '+22 11 46', 'lat' : '+37 59 04',
+        'height' : 2340., 'zhole' : 2.
+    },
+}
+
 class Sdata (object):
     """
     Stores positional, ephemeris and line weight data on a star.
