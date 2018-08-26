@@ -1,15 +1,24 @@
-trm.observing is a minimal package that is all about one script,
-"eplanner.py". It requires trm.subs to be available and used astropy
-and matplotlib. 
+trm.observing is a minimal package that is mainly about one script,
+"eplanner.py" along with a more recent addition "parallactic.py".
+It requires trm.subs and astropy to be available along with stuff
+that any decent python installation will have such as numpy and
+matplotlib.
 
-eplanner provides a visual representation of the times of eclipses
+"eplanner.py" provides a visual representation of the times of eclipses
 and visibility periods of multiple targets. 
 
+"parallactic.py" computes the parallactic angle of a given RA and Dec
+for an offset relative to the current time. Useful for spectroscopy.
 Installation is the usual
 
-python setup.py install --prefix=<installation directory>
+  python setup.py install --prefix=<installation directory>
 
-with the last part optional if you are root.
+or
 
-2017-04-30: has undergone extensive changes which will only work under python3
-and now require astropy and matplotlib rather than sla and pgplot.
+  python setup.py install --user
+
+with the last part optional if you are root. 
+
+Only python3 is supported.
+
+TRM
