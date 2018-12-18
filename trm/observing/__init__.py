@@ -301,8 +301,15 @@ def tnt_alert(alt, az):
     # left-hand point), (73.5,33.5) (apex), (21.0,50.) (lower right-hand
     # point). Assume that these define two great circles, and find the axial
     # vectors of these great circles.
-    ALT  = np.radians(np.array([21.0,73.5,21.0]))
-    AZ   = np.radians(np.array([25.5,33.5,50.0]))
+    #ALT  = np.radians(np.array([21.0,73.5,21.0]))
+    #AZ   = np.radians(np.array([25.5,33.5,50.0]))
+
+    # these ones have been expanded 2 degrees because we have had
+    # cases where targets have been affected by the mast but eplanner
+    # didn't say so i also moved the mast a bit to match better what
+    # happened on one of Steven's targets
+    ALT  = np.radians(np.array([21.0,76,21.0]))
+    AZ   = np.radians(np.array([25.,35.5,54.5]))
     calt, salt = np.cos(ALT), np.sin(ALT)
     caz,  saz  = np.cos(AZ), np.sin(AZ)
     v1  = subs.Vec3(saz[0]*calt[0], caz[0]*calt[0], salt[0])
