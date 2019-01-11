@@ -40,6 +40,7 @@ from matplotlib.ticker import MultipleLocator, FuncFormatter
 
 from astropy import time, coordinates as coord, units as u
 from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz
+from astropy.utils import iers
 
 from trm import observing
 from trm.observing import SITES
@@ -78,7 +79,7 @@ if __name__ == '__main__':
     # optional
     parser.add_argument(
         '-f', dest='hcopy', default=None,
-        help='Name for hard copy file, e.g. plot.pdf, plot.png (there will be no interactive plot in this case)')
+        help='Name for hard copy file, e.g. plot.pdf, plot.png there will be no interactive plot in this case)')
 
     parser.add_argument(
         '-t', dest='twilight', type=float, default=-15,
@@ -134,7 +135,13 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '-y', dest='height', type=float, default=8.27,
-        help='plot height, inches')
+        help='plot height, inches'
+    )
+
+    parser.add_argument(
+        '-i', dest='iers', default='',
+        help='URL of IERS table. should normally set one by default but if the server is down, you want another such as http://toshi.nofs.navy.mil/ser7/finals2000A.all'
+    )
 
     # parse them
     args = parser.parse_args()
@@ -143,6 +150,9 @@ if __name__ == '__main__':
     assert(args.airmass > 1 and args.airmass < 6)
     assert(args.width > 0 and args.height > 0)
     assert(args.telescope in SITES)
+
+    if args.iers != '':
+        iers.conf.iers_auto_url = args.iers
 
     # Interpret date. 
     date = time.Time(args.date, out_subfmt='date')
