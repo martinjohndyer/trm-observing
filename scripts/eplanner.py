@@ -54,6 +54,20 @@ def utc_formatter(x, pos):
     return '{:d}'.format(int(x))
 
 
+def iso_datehm(t):
+    """
+    Get round stricter astropy constraints on out_subfmt
+    """
+    try:
+        # works with astropy > 4.0.1
+        return t.to_value('iso', out_subfmt='date_hm')
+    except TypeError:
+        # fallback for older versions
+        out = t.copy(format='iso')
+        out.out_subfmt = 'date_hm'
+        return out.iso
+
+
 if __name__ == '__main__':
 
     # arguments
@@ -154,8 +168,8 @@ if __name__ == '__main__':
     if args.iers != '':
         iers.conf.iers_auto_url = args.iers
 
-    # Interpret date. 
-    date = time.Time(args.date, out_subfmt='date')
+    # Interpret date.
+    date = time.Time(args.date)
 
     # Location
     info = SITES[args.telescope]
@@ -200,33 +214,30 @@ if __name__ == '__main__':
     # sunset & sunrise times
     sunset = observing.sun_at_alt(day1, night, site, -0.25)
     sunrise = observing.sun_at_alt(night, day2, site, -0.25)
-    sunset.out_subfmt='date_hm'
-    sunrise.out_subfmt='date_hm'
 
     # integer offset
     isun = int(sunset.mjd)
     utc1 = 24.*(sunset.mjd-isun)
     utc2 = 24.*(sunrise.mjd-isun)
-    print('Sun is at alt=-0.25 at {0:s} and {1:s}'.format(sunset.iso,sunrise.iso))
+    print('Sun is at alt=-0.25 at {0:s} and {1:s}'.format(
+        iso_datehm(sunset), iso_datehm(sunrise)))
 
     # the lines in the plot will terminate at the point the Sun is at -10 as
     # the absolute limit for observation.
     rset = observing.sun_at_alt(day1, night, site, -10.)
     rrise = observing.sun_at_alt(night, day2, site, -10.)
-    rset.out_subfmt='date_hm'
-    rrise.out_subfmt='date_hm'
     utc5 = 24.*(rset.mjd-isun)
     utc6 = 24.*(rrise.mjd-isun)
-    print('Sun is at alt=-10.0 at {0:s} and {1:s}'.format(rset.iso,rrise.iso))
+    print('Sun is at alt=-10.0 at {0:s} and {1:s}'.format(
+        iso_datehm(rset), iso_datehm(rrise)))
 
     # user-defined twilight -- will be indicated on the plot with dashed lines
     twiset = observing.sun_at_alt(day1, night, site, args.twilight)
     twirise = observing.sun_at_alt(night, day2, site, args.twilight)
-    twiset.out_subfmt='date_hm'
-    twirise.out_subfmt='date_hm'
     utc3 = 24.*(twiset.mjd-isun)
     utc4 = 24.*(twirise.mjd-isun)
-    print('Sun is at alt={0:5.1f} at {1:s} and {2:s}'.format(args.twilight,twiset.iso,twirise.iso))
+    print('Sun is at alt={0:5.1f} at {1:s} and {2:s}'.format(
+        args.twilight, iso_datehm(twiset), iso_datehm(twirise)))
 
     # simulate the old PGPLOT colours
     cols = {
@@ -251,7 +262,7 @@ if __name__ == '__main__':
         if sw.utc < utc1 and sw.utc+24 < utc2:
             sw.utc += 24.
 
-    # set up general scale, draw vertical dashed lines every minor 
+    # set up general scale, draw vertical dashed lines every minor
     # tick spacing
     utstart = utc1 - 0.5
     utend = utc2 + 0.5
@@ -272,7 +283,7 @@ if __name__ == '__main__':
     axr.plot([utc4,utc4],[0,1],'--',**kwargs)
 
     # then labels
-    kwargs = {'color' : cols[2], 'ha' : 'center', 'va' : 'center', 
+    kwargs = {'color' : cols[2], 'ha' : 'center', 'va' : 'center',
               'size' : 10}
     axr.text(utc1, 1.02, 'sunset', **kwargs)
     axr.text(utc2, 1.02, 'sunrise', **kwargs)
@@ -548,6 +559,7 @@ if __name__ == '__main__':
 
     # finish off
     axr.set_xlabel('UTC')
+    date.out_subfmt='date'
     axr.set_title('{0!s} ({1:s}, airmass < {2:3.1f})'.format(
         date, args.telescope, args.airmass))
 
