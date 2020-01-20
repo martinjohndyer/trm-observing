@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     if args.iers != '':
         iers.conf.iers_auto_url = args.iers
 
-    # Interpret date. 
+    # Interpret date.
     date = time.Time(args.date, out_subfmt='date')
 
     # Location
