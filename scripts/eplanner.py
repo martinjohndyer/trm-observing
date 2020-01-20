@@ -61,7 +61,7 @@ def iso_datehm(t):
     try:
         # works with astropy > 4.0.1
         return t.to_value('iso', out_subfmt='date_hm')
-    except TypeError:
+    except AttributeError:
         # fallback for older versions
         out = t.copy(format='iso')
         out.out_subfmt = 'date_hm'
@@ -220,7 +220,8 @@ if __name__ == '__main__':
     utc1 = 24.*(sunset.mjd-isun)
     utc2 = 24.*(sunrise.mjd-isun)
     print('Sun is at alt=-0.25 at {0:s} and {1:s}'.format(
-        iso_datehm(sunset), iso_datehm(sunrise)))
+        iso_datehm(sunset), iso_datehm(sunrise))
+    )
 
     # the lines in the plot will terminate at the point the Sun is at -10 as
     # the absolute limit for observation.
