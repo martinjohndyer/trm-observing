@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
-
 usage = \
 """ Plots out observing schedules, with a focus on periodic events. You
 supply a file of target positions and ephemerides, another defining phase
@@ -27,7 +25,9 @@ A curved, red dashed line represents the elevation of the Moon. An indication of
 its illuminated percentage is written at the top and its minimum separation from
 targets is indicated if it is below a user-defined minimum.
 
-Black dots indicate phase 0 for any targets with ephemerides.
+Black dots indicate phase 0 for any targets with ephemerides. Similar-sized
+open circles mark phase 0.5, but only if coverage of that phase has been
+specified.
 """
 import argparse
 import datetime
@@ -44,6 +44,7 @@ from astropy.utils import iers
 
 from trm import observing
 from trm.observing import SITES
+
 
 def utc_formatter(x, pos):
     """
@@ -522,12 +523,19 @@ if __name__ == '__main__':
                 plt.plot([utend-2.*delta,utend-2*delta],[y-0.005,y+0.005],'k',lw=2)
                 plt.plot([utend,utend],[y-0.005,y+0.005],'k',lw=2)
 
+
+            plothalf = False
             if key in prinfo:
                 pr   = prinfo[key]
 
                 # Draw phase ranges of interest
                 pranges = pr.prange
                 for p1, p2, col, lw, p_or_t in pranges:
+
+                    if (p1 < 0.5 and p2 > 0.5) or (p1 < -0.5 and p2 > -0.5) or (p1 < 1.5 and p2 > 1.5):
+                        # determine whether or not to draw circles at phase 0.5
+                        plothalf = True
+
                     if p_or_t == 'Phase':
                         d1 = pstart + (p1 - pstart) % 1 - 1
                         d2 = pend + (p1 - pend) % 1
@@ -547,6 +555,15 @@ if __name__ == '__main__':
             for n in range(nphs):
                 ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
                 plt.plot(ut,y,'ok',ms=4)
+
+            # draws circles at phase 0.5
+            if plothalf:
+                d1 = np.ceil(pstart-0.5)
+                d2 = np.floor(pend-0.5)
+                nphs = int(np.ceil(d2 - d1))+1
+                for n in range(nphs):
+                    ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart + 0.5)/(pend-pstart)
+                    plt.plot(ut,y,'o',ms=4,mfc='w',mec='k')
 
         # draw vertical bar at meridian crossing
         if ok.any():
