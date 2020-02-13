@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='trm.observing',
-      version='1.0.0',
+      version='1.0.1',
       packages = ['trm', 'trm.observing'],
       scripts=['scripts/eplanner.py', 'scripts/parallactic.py'],
 
