@@ -7,28 +7,29 @@ ranges of interest and optionally a third specifying when to switch targets,
 and this will make a graphical representation of the results.
 
 The tracks for the stars start and stop when they reach a user-defined
-airmass, set to 2.2 by default, or when the Sun is 10 degrees below the
-horizon, whichever is more constraining. Sun at -10 is optimistic for most
-targets.
+airmass, set to 2.2 by default, or when the Sun is 10 degrees below
+the horizon, whichever is more constraining. Sun at -10 is optimistic
+for most targets.
 
-If you see horizontal black error bars at the far right, these indicate +/- 1
-sigma uncertainties on ephemerides. As quoted uncertainties can barely ever be
-trusted, they are indicative only. If they are big, be careful: your eclipse
-may not appear when you expect.
+If you see horizontal black error bars at the far right, these
+indicate +/- 1 sigma uncertainties on ephemerides. As quoted
+uncertainties can barely ever be trusted, they are indicative only. If
+they are big, be careful: your eclipse may not appear when you expect.
 
-Grey boxes represent zenith holes for Alt/Az telescopes which can't track very
-close to the zenith. These are not always hard limits, but you may not be able
-to observe during these intervals. For the TNT there is also a special
-indicator of close approach to the TV mast (only approximate).
+Grey boxes represent zenith holes for Alt/Az telescopes which can't
+track very close to the zenith. These are not always hard limits, but
+you may not be able to observe during these intervals. For the TNT
+there is also a special indicator of close approach to the TV mast
+(only approximate).
 
-A curved, red dashed line represents the elevation of the Moon. An indication of
-its illuminated percentage is written at the top and its minimum separation from
-targets is indicated if it is below a user-defined minimum.
+A curved, red dashed line represents the elevation of the Moon. An
+indication of its illuminated percentage is written at the top and its
+minimum separation from targets is indicated if it is below a
+user-defined minimum.
 
-Black dots indicate phase 0 for any targets with ephemerides. Similar-sized
-open circles mark phase 0.5, but only if coverage of that phase has been
-specified.
-"""
+Black dots indicate phase 0 for any targets with
+ephemerides. Similar-sized open circles mark phase 0.5, but only if
+coverage of that phase has been specified.  """
 import argparse
 import datetime
 
@@ -444,9 +445,9 @@ if __name__ == '__main__':
 
         if not start:
             plt.fill([air_start,air_end,air_end,air_start],
-                     [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
+                     [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9], zorder=10, alpha=0.65)
             plt.plot([air_start,air_end,air_end,air_start,air_start],
-                     [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
+                     [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8, zorder=11)
 
         # TNT has a stupid TV aerial
         if args.telescope == 'TNT':
@@ -477,9 +478,9 @@ if __name__ == '__main__':
             # Plot the bad periods
             for air_start, air_end in aerial:
                 axr.fill([air_start,air_end,air_end,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9])
+                         [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9], zorder=10, alpha=0.65)
                 axr.plot([air_start,air_end,air_end,air_start,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8)
+                         [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8, zorder=11)
 
         if key in prinfo:
             # handles the time ranges only
@@ -573,7 +574,7 @@ if __name__ == '__main__':
             if hamin < 0 and hamax > 0.:
                 has = np.abs(has[ok])
                 utc_mer = utcs[ok][has.argmin()]
-                plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2)
+                plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2,zorder=20)
 
     # finish off
     axr.set_xlabel('UTC')
