@@ -383,14 +383,16 @@ if __name__ == '__main__':
 
         first = True
         afirst = True
-        for flag, utc, mjd in zip(ok, utcs, mjds):
+        for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
             if first and flag:
                 ut_start = utc
+                n_start = n
                 first = False
                 if afirst:
                     mjd_first = mjd
                     utc_first = utc
                     afirst = False
+
             elif not flag and not first:
                 first = True
                 axr.plot([ut_start,utc],[y,y],'--',color=col)
@@ -399,7 +401,7 @@ if __name__ == '__main__':
                 axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
                 mjd_last = mjd
                 utc_last = utc
-
+                n_end = n+1
                 if ut_start > utstart + args.offset*(utend-utstart):
                     # repeat target name if the start is delayed to make it
                     # easier to line up names and tracks
@@ -415,6 +417,7 @@ if __name__ == '__main__':
             axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
             mjd_last = mjd
             utc_last = utc
+            n_end = n + 1
 
             if ut_start > utstart + args.offset*(utend-utstart):
                 # repeat target name if the start is delayed to make it
@@ -566,15 +569,41 @@ if __name__ == '__main__':
                     ut = utc_first + (utc_last-utc_first)*(d1 + n - pstart + 0.5)/(pend-pstart)
                     plt.plot(ut,y,'o',ms=4,mfc='w',mec='k')
 
-        # draw vertical bar at meridian crossing
+        # draw vertical bar at meridian crossing based on what the
+        # azimuth does. bit horrible because of odd way azimuth can
+        # behave.
         if ok.any():
-            lst = mjds.sidereal_time(kind='mean', longitude=site.lon)
-            has = (lst - star.position.ra).value
-            hamin, hamax = has[ok].min(), has[ok].max()
-            if hamin < 0 and hamax > 0.:
-                has = np.abs(has[ok])
-                utc_mer = utcs[ok][has.argmin()]
-                plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2,zorder=20)
+            az_start, az_end = azs[n_start], azs[n_end-1]
+            az_min, az_max = azs[n_start:n_end].min(), azs[n_start:n_end].max()
+
+            if az_start < 180 and az_end > 180:
+                # OK, we do cross the meridian
+                razs = azs[n_start:n_end]
+                rutcs = utcs[n_start:n_end]
+                az0 = razs.min()
+                az180 = np.abs(razs-180).min()
+                if az0 < az180:
+                    # we cross to the North of zenith
+                    # chop down to actual moment of crossing
+                    corr = razs > 180
+                    razs[corr] -= 360
+                    nmin = np.argmin(razs[razs > 0])
+                    nmax = min(len(razs), nmin+2)
+                    if nmax == nmin+2:
+                        razs = razs[nmin:nmax]
+                        rutcs = rutcs[nmin:nmax]
+                        utc_mer = np.interp(0.,razs[::-1],rutcs[::-1])
+                        plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2,zorder=20)
+                else:
+                    # we cross to the South of zenith
+                    # chop down to actual moment of crossing
+                    nmin = np.argmax(razs[razs < 180])
+                    nmax = min(len(razs), nmin+2)
+                    if nmax == nmin+2:
+                        razs = razs[nmin:nmin+2]
+                        rutcs = rutcs[nmin:nmin+2]
+                        utc_mer = np.interp(180.,razs,rutcs)
+                        plt.plot([utc_mer,utc_mer],[y-1.3*lbar,y+1.3*lbar],'k',lw=2,zorder=20)
 
     # finish off
     axr.set_xlabel('UTC')
