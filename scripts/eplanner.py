@@ -63,7 +63,7 @@ def iso_datehm(t):
     try:
         # works with astropy > 4.0.1
         return t.to_value('iso', out_subfmt='date_hm')
-    except AttributeError:
+    except (AttributeError, TypeError):
         # fallback for older versions
         out = t.copy(format='iso')
         out.out_subfmt = 'date_hm'
