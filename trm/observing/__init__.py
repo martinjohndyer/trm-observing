@@ -46,6 +46,11 @@ SITES = {
         'long' : '+22 11 46', 'lat' : '+37 59 04',
         'height' : 2340., 'zhole' : 2.
     },
+
+    'SAAO' : {
+        'long' : '+20 48 42', 'lat' : '-32 23 14',
+        'height' : 1798., 'zhole' : -1.
+    },
 }
 
 class Sdata (object):
