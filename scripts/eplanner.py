@@ -357,6 +357,7 @@ if __name__ == '__main__':
     plt.plot(utcs,alts/90.,'--',color=cols[2])
 
     # Finally, loop through the stars listed in the phase ranges.
+    lbar = min(0.01, 1./len(keys)/3.)
     for key in keys:
         star = peinfo[key]
         y = ys[key]
@@ -396,7 +397,6 @@ if __name__ == '__main__':
             elif not flag and not first:
                 first = True
                 axr.plot([ut_start,utc],[y,y],'--',color=col)
-                lbar = min(0.01, 1./len(keys)/4.)
                 axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col)
                 axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
                 mjd_last = mjd
@@ -412,7 +412,6 @@ if __name__ == '__main__':
         if flag and not first:
             # stuff left over to plot
             axr.plot([ut_start,utc],[y,y],'--',color=col)
-            lbar = min(0.01, 1./len(keys)/4.)
             axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col)
             axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
             mjd_last = mjd
@@ -448,9 +447,9 @@ if __name__ == '__main__':
 
         if not start:
             plt.fill([air_start,air_end,air_end,air_start],
-                     [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9], zorder=10, alpha=0.65)
+                     [y-lbar,y-lbar,y+lbar,y+lbar], color=cols[9], zorder=10, alpha=0.65)
             plt.plot([air_start,air_end,air_end,air_start,air_start],
-                     [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8, zorder=11)
+                     [y-lbar,y-lbar,y+lbar,y+lbar,y-lbar], color='k',lw=0.8, zorder=11)
 
         # TNT has a stupid TV aerial
         if args.telescope == 'TNT':
@@ -481,9 +480,9 @@ if __name__ == '__main__':
             # Plot the bad periods
             for air_start, air_end in aerial:
                 axr.fill([air_start,air_end,air_end,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01], color=cols[9], zorder=10, alpha=0.65)
+                         [y-lbar,y-lbar,y+lbar,y+lbar], color=cols[9], zorder=10, alpha=0.65)
                 axr.plot([air_start,air_end,air_end,air_start,air_start],
-                         [y-0.01,y-0.01,y+0.01,y+0.01,y-0.01], color='k',lw=0.8, zorder=11)
+                         [y-lbar,y-lbar,y+lbar,y+lbar,y-lbar], color='k',lw=0.8, zorder=11)
 
         if key in prinfo:
             # handles the time ranges only
