@@ -503,11 +503,11 @@ if __name__ == '__main__':
             # Now the phase info
 
             eph = star.eph
-            times = time.Time((mjd_first,mjd_last),location=site)
+            times = time.Time((mjd_first,mjd_last))
             if eph.time.startswith('H'):
-                times += times.light_travel_time(star.position, 'heliocentric')
+                times += times.light_travel_time(star.position, 'heliocentric', location=site)
             elif eph.time.startswith('B'):
-                times += times.light_travel_time(star.position)
+                times += times.light_travel_time(star.position, location=site)
             else:
                 raise Exception('Unrecognised type of time = ' + eph.time)
 
