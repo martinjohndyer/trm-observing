@@ -102,7 +102,7 @@ if __name__ == '__main__':
         help='altitude of Sun for twilight [degrees]')
 
     parser.add_argument(
-        '-m', dest='mdist', type=float, default=20,
+        '-m', dest='mdist', type=float, default=25,
         help='separation below which to highlight that the Moon gets close [degrees]')
 
     parser.add_argument(
