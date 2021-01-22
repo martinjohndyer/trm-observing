@@ -519,14 +519,6 @@ if __name__ == '__main__':
             else:
                 raise Exception('Unrecognised type of time = ' + eph.time)
 
-            # Compute uncertainty in predictions
-            delta = 24.*min(eph.etime((pstart+pend)/2.), eph.coeff[1]/2.)
-            if delta > 0.03:
-                plt.plot([utend-2.*delta,utend],[y,y],'k',lw=2)
-                plt.plot([utend-2.*delta,utend-2*delta],[y-0.005,y+0.005],'k',lw=2)
-                plt.plot([utend,utend],[y-0.005,y+0.005],'k',lw=2)
-
-
             plothalf = False
             if key in prinfo:
                 pr   = prinfo[key]
@@ -550,6 +542,13 @@ if __name__ == '__main__':
                             ut2  = min(ut2, utc_last)
                             if ut1 < ut2:
                                 plt.plot([ut1,ut2],[y,y],color=cols[col],lw=lw)
+
+            # Compute uncertainty in predictions
+            delta = 24.*min(eph.etime((pstart+pend)/2.), eph.coeff[1]/2.)
+            if delta > 0.03:
+                plt.plot([utend-2.*delta,utend],[y,y],'k',lw=2)
+                plt.plot([utend-2.*delta,utend-2*delta],[y-0.005,y+0.005],'k',lw=2)
+                plt.plot([utend,utend],[y-0.005,y+0.005],'k',lw=2)
 
             # draws dots at phase zero
             d1 = np.ceil(pstart)
