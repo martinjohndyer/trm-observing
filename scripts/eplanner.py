@@ -94,32 +94,58 @@ if __name__ == '__main__':
 
     # optional
     parser.add_argument(
-        '-f', dest='hcopy', default=None,
-        help='Name for hard copy file, e.g. plot.pdf, plot.png there will be no interactive plot in this case)')
-
-    parser.add_argument(
-        '-t', dest='twilight', type=float, default=-15,
-        help='altitude of Sun for twilight [degrees]')
-
-    parser.add_argument(
-        '-m', dest='mdist', type=float, default=25,
-        help='separation below which to highlight that the Moon gets close [degrees]')
+        '-a', dest='airmass', type=float, default=2.2,
+        help='airmass limit.')
 
     parser.add_argument(
         '-c', dest='csize', type=float, default=1.0,
         help='default character size for star names')
 
     parser.add_argument(
-        '-a', dest='airmass', type=float, default=2.2,
-        help='airmass limit.')
+        '-d', dest='divide', type=float, default=0.18,
+        help='divide point between names on left and plot on right as fraction of total width')
+
+    parser.add_argument(
+        '-f', dest='hcopy', default=None,
+        help='Name for hard copy file, e.g. plot.pdf, plot.png there will be no interactive plot in this case)')
+
+    parser.add_argument(
+        '-i', dest='iers', default='',
+        help='URL of IERS table. should normally set one by default but if the server is down, you want another such as http://toshi.nofs.navy.mil/ser7/finals2000A.all'
+    )
+
+    parser.add_argument(
+        '-m', dest='mdist', type=float, default=25,
+        help='separation below which to highlight that the Moon gets close [degrees]')
 
     parser.add_argument(
         '-o', dest='offset', type=float, default=0.3,
         help='offset as fraction of plot width at which to print duplicate names.')
 
     parser.add_argument(
-        '-d', dest='divide', type=float, default=0.18,
-        help='divide point between names on left and plot on right as fraction of total width')
+        '-p', dest='prefix', default=None,
+        help='target name prefixes. These are placed before the left-hand list of target names to allow one to add e.g. priorities.')
+
+    parser.add_argument(
+        '-r', dest='reduce', type=float, default=None,
+        help='reduce plots as far as possible. Suppress any targets with phase ranges provides where the indicated phases do not crop up on the night, and also targets closer than the optional number of degrees from the Moon (default=0)')
+
+    parser.add_argument(
+        '-s', dest='switch', default=None,
+        help='switch targets data file name. Each line should have the format:\nstar name | start switch time (e.g. 12:34) | dead time\nwhere the dead time is the time taken (in minutes) to make the switch. The line will be split on the pipe | characters which must therefore not appear in the star name. Use a star name = None as the final switch to terminate early. The times should increase monotonically, so use times > 24 if necessary.')
+
+    parser.add_argument(
+        '-t', dest='twilight', type=float, default=-15,
+        help='altitude of Sun for twilight [degrees]')
+
+    parser.add_argument(
+        '-x', dest='width', type=float, default=11.69,
+        help='plot width, inches')
+
+    parser.add_argument(
+        '-y', dest='height', type=float, default=8.27,
+        help='plot height, inches'
+    )
 
     parser.add_argument(
         '--hfrac', type=float, default=0.84,
@@ -136,28 +162,6 @@ if __name__ == '__main__':
     parser.add_argument(
         '--xminor', type=float, default=1,
         help='spacing of minor ticks in X [hours]')
-
-    parser.add_argument(
-        '-p', dest='prefix', default=None,
-        help='target name prefixes. These are placed before the left-hand list of target names to allow one to add e.g. priorities.')
-
-    parser.add_argument(
-        '-s', dest='switch', default=None,
-        help='switch targets data file name. Each line should have the format:\nstar name | start switch time (e.g. 12:34) | dead time\nwhere the dead time is the time taken (in minutes) to make the switch. The line will be split on the pipe | characters which must therefore not appear in the star name. Use a star name = None as the final switch to terminate early. The times should increase monotonically, so use times > 24 if necessary.')
-
-    parser.add_argument(
-        '-x', dest='width', type=float, default=11.69,
-        help='plot width, inches')
-
-    parser.add_argument(
-        '-y', dest='height', type=float, default=8.27,
-        help='plot height, inches'
-    )
-
-    parser.add_argument(
-        '-i', dest='iers', default='',
-        help='URL of IERS table. should normally set one by default but if the server is down, you want another such as http://toshi.nofs.navy.mil/ser7/finals2000A.all'
-    )
 
     # parse them
     args = parser.parse_args()
@@ -362,7 +366,7 @@ if __name__ == '__main__':
         star = peinfo[key]
         y = ys[key]
 
-        # Compute airmasses for all times
+        # Compute airmasses of the star for all times
         altaz = star.position.transform_to(altazframe)
         airmasses = altaz.secz.value
         alts = altaz.alt.value
@@ -376,15 +380,92 @@ if __name__ == '__main__':
             sepmin = seps.min()
             moon_close = sepmin < args.mdist
             if moon_close:
-                col = cols[2]
+                col_moon = cols[2]
             else:
-                col = 'k'
+                col_moon = 'k'
         else:
             moon_close = False
 
+        if args.reduce:
+            # section designed to reduce clutter. see whether we can
+            # skip any targets according to whether they are too close
+            # to the Moon or they have indicated phase ranges that do
+            # not appear.
+
+            if args.reduce > sepmin:
+                # suppress targets too close to the Moon
+                print(f'reduce: skipping {key} as minimum distance from Moon = {sepmin} < {args.reduce}')
+                continue
+
+            if star.eph and key in prinfo:
+
+                # determine start / stop UTs
+                first = True
+                afirst = True
+                for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
+                    if first and flag:
+                        ut_start = utc
+                        n_start = n
+                        first = False
+                        if afirst:
+                            mjd_first = mjd
+                            utc_first = utc
+                            afirst = False
+                    elif not flag and not first:
+                        first = True
+                        mjd_last = mjd
+                        utc_last = utc
+                        n_end = n+1
+
+                # Now the phase info
+                eph = star.eph
+                times = time.Time((mjd_first,mjd_last))
+                if eph.time.startswith('H'):
+                    times += times.light_travel_time(star.position, 'heliocentric', location=site)
+                elif eph.time.startswith('B'):
+                    times += times.light_travel_time(star.position, location=site)
+                else:
+                    raise Exception('Unrecognised type of time = ' + eph.time)
+
+                if eph.time == 'HJD' or eph.time == 'BJD':
+                    pstart = eph.phase(times[0].jd)
+                    pend   = eph.phase(times[1].jd)
+                elif eph.time == 'HMJD' or eph.time == 'BMJD':
+                    pstart = eph.phase(times[0].mjd)
+                    pend   = eph.phase(times[1].mjd)
+                else:
+                    raise Exception('Unrecognised type of time = ' + eph.time)
+
+                # some over-complex jiggery-pokery with for / else, break & continue below
+                # probably silly to attempt
+                pr = prinfo[key]
+                pranges = pr.prange
+                for p1, p2, col, lw, p_or_t in pranges:
+                    if p_or_t == 'Phase':
+                        d1 = pstart + (p1 - pstart) % 1 - 1
+                        d2 = pend + (p1 - pend) % 1
+                        nphs = int(np.ceil(d2 - d1))
+                        for n in range(nphs):
+                            ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
+                            ut2  = ut1 + (utc_last-utc_first)/(pend-pstart)*(p2-p1)
+                            ut1  = max(ut1, utc_first)
+                            ut2  = min(ut2, utc_last)
+                            if ut1 < ut2:
+                                break
+                        else:
+                            # skip to next range avoiding break
+                            continue
+                    break
+                else:
+                    # skip everything to do with this star
+                    print(f'reduce: skipping {key} as no indicated phase ranges are observable this night')
+                    continue
+
+        # now start plotting stuff associated with individual targets
         first = True
         afirst = True
         for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
+
             if first and flag:
                 ut_start = utc
                 n_start = n
@@ -396,9 +477,9 @@ if __name__ == '__main__':
 
             elif not flag and not first:
                 first = True
-                axr.plot([ut_start,utc],[y,y],'--',color=col)
-                axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col)
-                axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
+                axr.plot([ut_start,utc],[y,y],'--',color=col_moon)
+                axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col_moon)
+                axr.plot([utc,utc],[y-lbar,y+lbar],color=col_moon)
                 mjd_last = mjd
                 utc_last = utc
                 n_end = n+1
@@ -411,9 +492,9 @@ if __name__ == '__main__':
 
         if flag and not first:
             # stuff left over to plot
-            axr.plot([ut_start,utc],[y,y],'--',color=col)
-            axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col)
-            axr.plot([utc,utc],[y-lbar,y+lbar],color=col)
+            axr.plot([ut_start,utc],[y,y],'--',color=col_moon)
+            axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col_moon)
+            axr.plot([utc,utc],[y-lbar,y+lbar],color=col_moon)
             mjd_last = mjd
             utc_last = utc
             n_end = n + 1
