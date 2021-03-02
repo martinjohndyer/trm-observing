@@ -327,30 +327,8 @@ if __name__ == '__main__':
         if ha < -12.: ha += 24
         has.append((ha, key))
 
+    # first go at plot order. might be reduced below
     keys = [item[1] for item in sorted(has, key=lambda ha: ha[0], reverse=True)]
-
-    # Now compute plot positions
-    ys = {}
-    for i,key in enumerate(keys):
-        ys[key] = (len(keys)-i)/float(len(keys)+1)
-
-    # Plot a line to represent which target to observe
-    if args.switch is not None:
-        kwargs = {'color' : cols[5], 'lw' : 5}
-
-        first = True
-        for sw in swinfo:
-            if first:
-                xstart, ystart = sw.utc,ys[sw.name]
-                first = False
-            else:
-                if sw.name == 'None':
-                    axr.plot([xstart,sw.utc],[ystart,ystart],**kwargs)
-                    break
-                else:
-                    xend, yend = sw.utc+sw.delta, ys[sw.name]
-                    axr.plot([xstart, sw.utc, xend],[ystart, ystart, yend],**kwargs)
-                    xstart, ystart = xend, yend
 
     # compute altitude of Moon through the night. Add as red dashed line
     # scaled so that 90 = top of plot.
@@ -360,13 +338,13 @@ if __name__ == '__main__':
     alts = altaz.alt.value
     plt.plot(utcs,alts/90.,'--',color=cols[2])
 
-    # Finally, loop through the stars listed in the phase ranges.
-    lbar = min(0.01, 1./len(keys)/3.)
+    # Loop through all targets
+    stored_info = {}
+    skipped_keys = []
     for key in keys:
         star = peinfo[key]
-        y = ys[key]
 
-        # Compute airmasses of the star for all times
+        # Compute airmasses of the star for all times (altazframe encodes them all))
         altaz = star.position.transform_to(altazframe)
         airmasses = altaz.secz.value
         alts = altaz.alt.value
@@ -395,6 +373,7 @@ if __name__ == '__main__':
             if args.reduce > sepmin:
                 # suppress targets too close to the Moon
                 print(f'reduce: skipping {key} as minimum distance from Moon = {sepmin} < {args.reduce}')
+                skipped_keys.append(key)
                 continue
 
             if star.eph and key in prinfo:
@@ -458,8 +437,75 @@ if __name__ == '__main__':
                     break
                 else:
                     # skip everything to do with this star
-                    print(f'reduce: skipping {key} as no indicated phase ranges are observable this night')
+                    print(f'reduce: skipping {key} as it has no observable phase ranges this night')
+                    skipped_keys.append(key)
                     continue
+
+        # Store for later retrieval
+        stored_info[key] = {
+            'airmasses' : airmasses,
+            'alts' : alts,
+            'azs' : azs,
+            'ok' : ok,
+            'moon_close' : moon_close,
+            'sepmin' : sepmin if moon_close else None
+        }
+
+    # Remove skipped targets
+    for key in skipped_keys:
+        print(f'Removing {key} from list of stars to plot')
+        keys.remove(key)
+
+    # Now compute plot positions
+    ys = {}
+    for i,key in enumerate(keys):
+        ys[key] = (len(keys)-i)/float(len(keys)+1)
+
+    # Plot a line to represent which target to observe
+    if args.switch is not None:
+        kwargs = {'color' : cols[5], 'lw' : 5}
+
+        first = True
+        for sw in swinfo:
+            if first:
+                xstart, ystart = sw.utc,ys[sw.name]
+                first = False
+            else:
+                if sw.name == 'None':
+                    axr.plot([xstart,sw.utc],[ystart,ystart],**kwargs)
+                    break
+                else:
+                    xend, yend = sw.utc+sw.delta, ys[sw.name]
+                    axr.plot([xstart, sw.utc, xend],[ystart, ystart, yend],**kwargs)
+                    xstart, ystart = xend, yend
+
+    # Finally, loop through the stars listed in the phase ranges.
+    lbar = min(0.01, 1./max(1,len(keys))/3.)
+    for key in keys:
+        star = peinfo[key]
+        y = ys[key]
+
+        # Retrieve values saved earlier
+        sinfo = stored_info[key]
+        airmasses = sinfo['airmasses']
+        alts = sinfo['alts']
+        azs = sinfo['azs']
+        ok = sinfo['ok']
+        moon_close = sinfo['moon_close']
+        sepmin = sinfo['sepmin']
+
+        # Compute minimum distance to the Moon during period target
+        # is above airmass limit
+        seps = moon.separation(star.position).degree[ok]
+        if len(seps):
+            sepmin = seps.min()
+            moon_close = sepmin < args.mdist
+            if moon_close:
+                col_moon = cols[2]
+            else:
+                col_moon = 'k'
+        else:
+            moon_close = False
 
         # now start plotting stuff associated with individual targets
         first = True
