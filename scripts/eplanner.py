@@ -248,11 +248,21 @@ if __name__ == '__main__':
 
     # simulate the old PGPLOT colours
     cols = {
-        2 : (0.7,0,0),
-        3 : (0,0.7,0),
-        4 : (0,0,0.7),
-        5 : (0.7,0.7,0.7),
+        2 : (0.7,0,0), # red
+        3 : (0,0.7,0), # green
+        4 : (0,0,0.7), # blue
+        5 : (0.7,0.7,0.7), # grey
         9 : (0.8,0.8,0.8),
+    }
+
+    # more memorable names
+    COLS = {
+        'red' : (0.7,0,0), # red
+        'green' : (0,0.7,0), # green
+        'blue' : (0,0,0.7), # blue
+        'grey1' : (0.7,0.7,0.7), # grey
+        'grey2' : (0.8,0.8,0.8),
+        'highlight' : (1,0.8,0.5),
     }
 
     # Start the plot
@@ -278,19 +288,19 @@ if __name__ == '__main__':
     n2 = int(np.ceil(utc2/args.xminor))
 
     for n in range(n1,n2):
-        axr.plot([n*args.xminor,n*args.xminor],[0,1],'--',color=cols[5])
+        axr.plot([n*args.xminor,n*args.xminor],[0,1],'--',color=COLS['grey2'])
 
     # mark sunset / twiset / twirise / sunrise
 
     # first with vertical lines
-    kwargs = {'color' : cols[2]}
+    kwargs = {'color' : COLS['red']}
     axr.plot([utc1,utc1],[0,1],'--',**kwargs)
     axr.plot([utc2,utc2],[0,1],'--',**kwargs)
     axr.plot([utc3,utc3],[0,1],'--',**kwargs)
     axr.plot([utc4,utc4],[0,1],'--',**kwargs)
 
     # then labels
-    kwargs = {'color' : cols[2], 'ha' : 'center', 'va' : 'center',
+    kwargs = {'color' : COLS['red'], 'ha' : 'center', 'va' : 'center',
               'size' : 10}
     axr.text(utc1, 1.02, 'sunset', **kwargs)
     axr.text(utc2, 1.02, 'sunrise', **kwargs)
@@ -336,7 +346,7 @@ if __name__ == '__main__':
     altazframe = AltAz(obstime=mjds, location=site)
     altaz = moon.transform_to(altazframe)
     alts = altaz.alt.value
-    plt.plot(utcs,alts/90.,'--',color=cols[2])
+    plt.plot(utcs,alts/90.,'--',color=COLS['red'])
 
     # Loop through all targets
     stored_info = {}
@@ -344,21 +354,22 @@ if __name__ == '__main__':
     for key in keys:
         star = peinfo[key]
 
-        # Compute airmasses of the star for all times (altazframe encodes them all))
+        # Compute airmasses of the star for all times (altazframe
+        # encodes them all))
         altaz = star.position.transform_to(altazframe)
         airmasses = altaz.secz.value
         alts = altaz.alt.value
         azs = altaz.az.value
         ok = alts > 90.-np.degrees(np.arccos(1./args.airmass))
 
-        # Compute minimum distance to the Moon during period target
-        # is above airmass limit
+        # Compute minimum distance to the Moon during period target is
+        # above airmass limit
         seps = moon.separation(star.position).degree[ok]
         if len(seps):
             sepmin = seps.min()
             moon_close = sepmin < args.mdist
             if moon_close:
-                col_moon = cols[2]
+                col_moon = COLS['red']
             else:
                 col_moon = 'k'
         else:
@@ -376,72 +387,84 @@ if __name__ == '__main__':
                 skipped_keys.append(key)
                 continue
 
-            if star.eph and key in prinfo:
+            if key in prinfo:
+                appears = False
 
-                # determine start / stop UTs
-                first = True
-                afirst = True
-                for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
-                    if first and flag:
-                        ut_start = utc
-                        n_start = n
-                        first = False
-                        if afirst:
-                            mjd_first = mjd
-                            utc_first = utc
-                            afirst = False
-                    elif not flag and not first:
-                        first = True
-                        mjd_last = mjd
-                        utc_last = utc
-                        n_end = n+1
-
-                # Now the phase info
-                eph = star.eph
-                times = time.Time((mjd_first,mjd_last))
-                if eph.time.startswith('H'):
-                    times += times.light_travel_time(star.position, 'heliocentric', location=site)
-                elif eph.time.startswith('B'):
-                    times += times.light_travel_time(star.position, location=site)
-                else:
-                    raise Exception('Unrecognised type of time = ' + eph.time)
-
-                if eph.time == 'HJD' or eph.time == 'BJD':
-                    pstart = eph.phase(times[0].jd)
-                    pend   = eph.phase(times[1].jd)
-                elif eph.time == 'HMJD' or eph.time == 'BMJD':
-                    pstart = eph.phase(times[0].mjd)
-                    pend   = eph.phase(times[1].mjd)
-                else:
-                    raise Exception('Unrecognised type of time = ' + eph.time)
-
-                # some over-complex jiggery-pokery with for / else, break & continue below
-                # probably silly to attempt
                 pr = prinfo[key]
                 pranges = pr.prange
-                for p1, p2, col, lw, p_or_t in pranges:
-                    if p_or_t == 'Phase':
-                        d1 = pstart + (p1 - pstart) % 1 - 1
-                        d2 = pend + (p1 - pend) % 1
-                        nphs = int(np.ceil(d2 - d1))
-                        for n in range(nphs):
-                            ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
-                            ut2  = ut1 + (utc_last-utc_first)/(pend-pstart)*(p2-p1)
-                            ut1  = max(ut1, utc_first)
-                            ut2  = min(ut2, utc_last)
+
+                # handle the time ranges
+                for t1, t2, col, lw, p_or_t in pranges:
+                    if p_or_t == 'Time':
+                        utc1, utc2 = 24.*(t1-isun), 24.*(t2-isun)
+                        if utc1 < utc_last and utc2 > ut_start:
+                            ut1  = max(utc1, ut_start)
+                            ut2  = min(utc2, utc_last)
                             if ut1 < ut2:
+                                appears = True
                                 break
-                        else:
-                            # skip to next range avoiding break
-                            continue
-                    break
-                else:
+
+                if not appears and star.eph:
+                    # now the phase ranges
+                    first = True
+                    afirst = True
+                    for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
+                        if first and flag:
+                            ut_start = utc
+                            n_start = n
+                            first = False
+                            if afirst:
+                                mjd_first = mjd
+                                utc_first = utc
+                                afirst = False
+                        elif not flag and not first:
+                            first = True
+                            mjd_last = mjd
+                            utc_last = utc
+                            n_end = n+1
+
+                    # Now the phase info
+                    eph = star.eph
+                    times = time.Time((mjd_first,mjd_last))
+                    if eph.time.startswith('H'):
+                        times += times.light_travel_time(star.position, 'heliocentric', location=site)
+                    elif eph.time.startswith('B'):
+                        times += times.light_travel_time(star.position, location=site)
+                    else:
+                        raise Exception('Unrecognised type of time = ' + eph.time)
+
+                    if eph.time == 'HJD' or eph.time == 'BJD':
+                        pstart = eph.phase(times[0].jd)
+                        pend   = eph.phase(times[1].jd)
+                    elif eph.time == 'HMJD' or eph.time == 'BMJD':
+                        pstart = eph.phase(times[0].mjd)
+                        pend   = eph.phase(times[1].mjd)
+                    else:
+                        raise Exception('Unrecognised type of time = ' + eph.time)
+
+                    for p1, p2, col, lw, p_or_t in pranges:
+                        if p_or_t == 'Phase':
+                            d1 = pstart + (p1 - pstart) % 1 - 1
+                            d2 = pend + (p1 - pend) % 1
+                            nphs = int(np.ceil(d2 - d1))
+                            for n in range(nphs):
+                                ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
+                                ut2  = ut1 + (utc_last-utc_first)/(pend-pstart)*(p2-p1)
+                                ut1  = max(ut1, utc_first)
+                                ut2  = min(ut2, utc_last)
+                                if ut1 < ut2:
+                                    appears = True
+                                    break
+                            if appears:
+                                break
+
+                if not appears:
                     # skip everything to do with this star
-                    print(f'reduce: skipping {key} as it has no observable phase ranges this night')
+                    print(f'reduce: skipping {key} as it has no observable phase or time ranges this night')
                     skipped_keys.append(key)
                     continue
 
-        # Store for later retrieval
+        # Store computed data for later retrieval
         stored_info[key] = {
             'airmasses' : airmasses,
             'alts' : alts,
@@ -463,7 +486,7 @@ if __name__ == '__main__':
 
     # Plot a line to represent which target to observe
     if args.switch is not None:
-        kwargs = {'color' : cols[5], 'lw' : 5}
+        kwargs = {'color' : COLS['grey1'], 'LW' : 5}
 
         first = True
         for sw in swinfo:
@@ -501,7 +524,7 @@ if __name__ == '__main__':
             sepmin = seps.min()
             moon_close = sepmin < args.mdist
             if moon_close:
-                col_moon = cols[2]
+                col_moon = COLS['red']
             else:
                 col_moon = 'k'
         else:
@@ -523,6 +546,9 @@ if __name__ == '__main__':
 
             elif not flag and not first:
                 first = True
+                if key not in prinfo:
+                    # highlight anytime objects
+                    axr.plot([ut_start,utc],[y,y],color=COLS['highlight'],lw=6,zorder=-10)
                 axr.plot([ut_start,utc],[y,y],'--',color=col_moon)
                 axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col_moon)
                 axr.plot([utc,utc],[y-lbar,y+lbar],color=col_moon)
@@ -538,6 +564,9 @@ if __name__ == '__main__':
 
         if flag and not first:
             # stuff left over to plot
+            if key not in prinfo:
+                # highlight anytime objects
+                axr.plot([ut_start,utc],[y,y],color=COLS['highlight'],lw=6,zorder=-10)
             axr.plot([ut_start,utc],[y,y],'--',color=col_moon)
             axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col_moon)
             axr.plot([utc,utc],[y-lbar,y+lbar],color=col_moon)
@@ -560,7 +589,7 @@ if __name__ == '__main__':
             axr.text(utc_last+0.07, y,
                      '${:d}^\circ$'.format(int(round(sepmin))),
                      ha='left', va='center', size=9*args.csize,
-                     color=cols[2])
+                     color=COLS['red'])
 
         # zenith holes
         start = True
@@ -574,7 +603,7 @@ if __name__ == '__main__':
 
         if not start:
             plt.fill([air_start,air_end,air_end,air_start],
-                     [y-lbar,y-lbar,y+lbar,y+lbar], color=cols[9], zorder=10, alpha=0.65)
+                     [y-lbar,y-lbar,y+lbar,y+lbar], color=COLS['grey2'], zorder=10, alpha=0.65)
             plt.plot([air_start,air_end,air_end,air_start,air_start],
                      [y-lbar,y-lbar,y+lbar,y+lbar,y-lbar], color='k',lw=0.8, zorder=11)
 
@@ -607,7 +636,7 @@ if __name__ == '__main__':
             # Plot the bad periods
             for air_start, air_end in aerial:
                 axr.fill([air_start,air_end,air_end,air_start],
-                         [y-lbar,y-lbar,y+lbar,y+lbar], color=cols[9], zorder=10, alpha=0.65)
+                         [y-lbar,y-lbar,y+lbar,y+lbar], color=COLS['grey2'], zorder=10, alpha=0.65)
                 axr.plot([air_start,air_end,air_end,air_start,air_start],
                          [y-lbar,y-lbar,y+lbar,y+lbar,y-lbar], color='k',lw=0.8, zorder=11)
 
@@ -619,9 +648,10 @@ if __name__ == '__main__':
             for t1, t2, col, lw, p_or_t in pranges:
                 if p_or_t == 'Time':
                     utc1, utc2 = 24.*(t1-isun), 24.*(t2-isun)
-                    if utc1 < utc_end and utc2 > utc_start:
-                        ut1  = max(utc1, utc_start)
-                        ut2  = min(utc2, utc_end)
+                    if utc1 < utc_last and utc2 > ut_start:
+                        print('>>>',utc1,utc2,t1,t2,isun)
+                        ut1  = max(utc1, ut_start)
+                        ut2  = min(utc2, utc_last)
                         if ut1 < ut2:
                             plt.plot([ut1,ut2],[y,y],color=cols[col],lw=lw)
 

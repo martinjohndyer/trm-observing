@@ -252,7 +252,7 @@ class Prange(object):
         p1  = float(p1)
         p2  = float(p2)
         if p1 < 1000.:
-            p2  = p2 - m.floor(p2-p1)
+            p2 = p2 - m.floor(p2-p1)
             p_or_t = 'Phase'
         else:
             p_or_t = 'Time'
