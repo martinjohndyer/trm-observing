@@ -388,81 +388,90 @@ if __name__ == '__main__':
                 continue
 
             if key in prinfo:
-                appears = False
-
+                # target has phase or time range info
                 pr = prinfo[key]
                 pranges = pr.prange
-
-                # handle the time ranges
-                for t1, t2, col, lw, p_or_t in pranges:
-                    if p_or_t == 'Time':
-                        utc1, utc2 = 24.*(t1-isun), 24.*(t2-isun)
-                        if utc1 < utc_last and utc2 > ut_start:
-                            ut1  = max(utc1, ut_start)
-                            ut2  = min(utc2, utc_last)
-                            if ut1 < ut2:
-                                appears = True
-                                break
-
-                if not appears and star.eph:
-                    # now the phase ranges
-                    first = True
-                    afirst = True
-                    for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
-                        if first and flag:
-                            ut_start = utc
-                            n_start = n
+                
+                # determine start and stop times of visibility
+                # period. a bit complex because can have targets that
+                # are visible at start and end but not the middle
+                first = True
+                for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
+                    if flag:
+                        if first:
+                            # start a visibility interval
+                            utc_start = utc_end = utc
+                            mjd_start = mjd_end = mjd
                             first = False
-                            if afirst:
-                                mjd_first = mjd
-                                utc_first = utc
-                                afirst = False
-                        elif not flag and not first:
-                            first = True
-                            mjd_last = mjd
-                            utc_last = utc
-                            n_end = n+1
+                        else:
+                            # extend a visibility interval
+                            utc_end = utc
+                            mjd_end = mjd
 
-                    # Now the phase info
-                    eph = star.eph
-                    times = time.Time((mjd_first,mjd_last))
-                    if eph.time.startswith('H'):
-                        times += times.light_travel_time(star.position, 'heliocentric', location=site)
-                    elif eph.time.startswith('B'):
-                        times += times.light_travel_time(star.position, location=site)
-                    else:
-                        raise Exception('Unrecognised type of time = ' + eph.time)
+                    if (not flag or n == len(ok)-1) and not first:
+                        # end a visibility interval
+                        first = True
 
-                    if eph.time == 'HJD' or eph.time == 'BJD':
-                        pstart = eph.phase(times[0].jd)
-                        pend   = eph.phase(times[1].jd)
-                    elif eph.time == 'HMJD' or eph.time == 'BMJD':
-                        pstart = eph.phase(times[0].mjd)
-                        pend   = eph.phase(times[1].mjd)
-                    else:
-                        raise Exception('Unrecognised type of time = ' + eph.time)
+                        # now test whether any phase or time ranges overlap
+                        pstart = None
+                        for pt1, pt2, col, lw, p_or_t in pranges:
+                            
+                            if p_or_t == 'Time':
+                                utc1, utc2 = 24.*(pt1-isun), 24.*(pt2-isun)
+                                if utc1 < utc_end and utc2 > utc_start:
+                                    ut1  = max(utc1, utc_start)
+                                    ut2  = min(utc2, utc_end)
+                                    if ut1 < ut2:
+                                        # yes, we have overlap
+                                        break
+                                    
+                            elif p_or_t == 'Phase':
+                                # Now the phase info
+                                if pstart is None:
+                                    # must compute start and stop phases 
+                                    eph = star.eph
+                                    times = time.Time((mjd_start,mjd_end))
+                                    if eph.time.startswith('H'):
+                                        times += times.light_travel_time(star.position, 'heliocentric', location=site)
+                                    elif eph.time.startswith('B'):
+                                        times += times.light_travel_time(star.position, location=site)
+                                    else:
+                                        raise Exception('Unrecognised type of time = ' + eph.time)
 
-                    for p1, p2, col, lw, p_or_t in pranges:
-                        if p_or_t == 'Phase':
-                            d1 = pstart + (p1 - pstart) % 1 - 1
-                            d2 = pend + (p1 - pend) % 1
-                            nphs = int(np.ceil(d2 - d1))
-                            for n in range(nphs):
-                                ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
-                                ut2  = ut1 + (utc_last-utc_first)/(pend-pstart)*(p2-p1)
-                                ut1  = max(ut1, utc_first)
-                                ut2  = min(ut2, utc_last)
-                                if ut1 < ut2:
-                                    appears = True
-                                    break
-                            if appears:
+                                    if eph.time == 'HJD' or eph.time == 'BJD':
+                                        pstart = eph.phase(times[0].jd)
+                                        pend   = eph.phase(times[1].jd)
+                                    elif eph.time == 'HMJD' or eph.time == 'BMJD':
+                                        pstart = eph.phase(times[0].mjd)
+                                        pend   = eph.phase(times[1].mjd)
+                                    else:
+                                        raise Exception('Unrecognised type of time = ' + eph.time)
+
+                                d1 = pstart + (pt1 - pstart) % 1 - 1
+                                d2 = pend + (pt1 - pend) % 1
+                                nphs = int(np.ceil(d2 - d1))
+                                for n in range(nphs):
+                                    ut1 = utc_start + (utc_end-utc_start)*(d1 + n - pstart)/(pend-pstart)
+                                    ut2  = ut1 + (utc_end-utc_start)/(pend-pstart)*(pt2-pt1)
+                                    ut1  = max(ut1, utc_start)
+                                    ut2  = min(ut2, utc_end)
+                                    if ut1 < ut2:
+                                        break
+                                else:
+                                    # no phase ranges have overlapped, so just continue
+                                    continue
+
+                                # only get here from the break statement a few lines back
+                                # so break again to escape outer loop
                                 break
+                        else:
+                            # if we get here, there has been no
+                            # overlap of any kind so skip the target
+                            skipped_keys.append(key)
+                            print(f'reduce: skipping {key} as it has no observable phase or time ranges this night')
 
-                if not appears:
-                    # skip everything to do with this star
-                    print(f'reduce: skipping {key} as it has no observable phase or time ranges this night')
-                    skipped_keys.append(key)
-                    continue
+                            # continue to next target
+                            continue
 
         # Store computed data for later retrieval
         stored_info[key] = {
@@ -535,61 +544,53 @@ if __name__ == '__main__':
         afirst = True
         for n, (flag, utc, mjd) in enumerate(zip(ok, utcs, mjds)):
 
-            if first and flag:
-                ut_start = utc
-                n_start = n
-                first = False
-                if afirst:
-                    mjd_first = mjd
-                    utc_first = utc
-                    afirst = False
-
-            elif not flag and not first:
+            if flag:
+                if first:
+                    utc_start = utc_end = utc
+                    n_start = n
+                    first = False
+                    if afirst:
+                        mjd_first = mjd_last = mjd
+                        utc_first = utc_last = utc
+                        afirst = False
+                else:
+                    utc_end = utc_last = utc
+                    mjd_last = mjd
+    
+            if (not flag or n == len(ok)-1) and not first:
                 first = True
                 if key not in prinfo:
                     # highlight anytime objects
-                    axr.plot([ut_start,utc],[y,y],color=COLS['highlight'],lw=6,zorder=-10)
-                axr.plot([ut_start,utc],[y,y],'--',color=col_moon)
-                axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col_moon)
-                axr.plot([utc,utc],[y-lbar,y+lbar],color=col_moon)
-                mjd_last = mjd
-                utc_last = utc
-                n_end = n+1
-                if ut_start > utstart + args.offset*(utend-utstart):
+                    axr.plot([utc_start,utc_end],[y,y],color=COLS['highlight'],lw=6,zorder=-10)
+
+                # plot visibility period, highlighted if close to the Moon
+                axr.plot([utc_start,utc_end],[y,y],'--',color=col_moon)
+                axr.plot([utc_start,utc_start],[y-lbar,y+lbar],color=col_moon)
+                axr.plot([utc_end,utc_end],[y-lbar,y+lbar],color=col_moon)
+
+                if flag:
+                    n_end = n+1
+                else:
+                    n_end = n
+
+                if utc_start > utstart + args.offset*(utend-utstart):
                     # repeat target name if the start is delayed to make it
                     # easier to line up names and tracks
                     kwargs = {'ha' : 'right', 'va' : 'center',
                               'size' : 9*args.csize}
-                    axr.text(ut_start-0.2, y, key, **kwargs)
-
-        if flag and not first:
-            # stuff left over to plot
-            if key not in prinfo:
-                # highlight anytime objects
-                axr.plot([ut_start,utc],[y,y],color=COLS['highlight'],lw=6,zorder=-10)
-            axr.plot([ut_start,utc],[y,y],'--',color=col_moon)
-            axr.plot([ut_start,ut_start],[y-lbar,y+lbar],color=col_moon)
-            axr.plot([utc,utc],[y-lbar,y+lbar],color=col_moon)
-            mjd_last = mjd
-            utc_last = utc
-            n_end = n + 1
-
-            if ut_start > utstart + args.offset*(utend-utstart):
-                # repeat target name if the start is delayed to make it
-                # easier to line up names and tracks
-                kwargs = {'ha' : 'right', 'va' : 'center',
-                          'size' : 9*args.csize}
-                axr.text(ut_start-0.2, y, key, **kwargs)
+                    axr.text(utc_start-0.2, y, key, **kwargs)
 
         if afirst:
             # never found any ok bit; move on ...
             continue
 
         if moon_close:
-            axr.text(utc_last+0.07, y,
-                     '${:d}^\circ$'.format(int(round(sepmin))),
-                     ha='left', va='center', size=9*args.csize,
-                     color=COLS['red'])
+            axr.text(
+                utc_last+0.07, y,
+                '${:d}^\circ$'.format(int(round(sepmin))),
+                ha='left', va='center', size=9*args.csize,
+                color=COLS['red']
+            )
 
         # zenith holes
         start = True
@@ -602,10 +603,16 @@ if __name__ == '__main__':
                 break
 
         if not start:
-            plt.fill([air_start,air_end,air_end,air_start],
-                     [y-lbar,y-lbar,y+lbar,y+lbar], color=COLS['grey2'], zorder=10, alpha=0.65)
-            plt.plot([air_start,air_end,air_end,air_start,air_start],
-                     [y-lbar,y-lbar,y+lbar,y+lbar,y-lbar], color='k',lw=0.8, zorder=11)
+            plt.fill(
+                [air_start,air_end,air_end,air_start],
+                [y-lbar,y-lbar,y+lbar,y+lbar],
+                color=COLS['grey2'], zorder=10, alpha=0.65
+            )
+            plt.plot(
+                [air_start,air_end,air_end,air_start,air_start],
+                [y-lbar,y-lbar,y+lbar,y+lbar,y-lbar],
+                color='k',lw=0.8, zorder=11
+            )
 
         # TNT has a stupid TV aerial
         if args.telescope == 'TNT':
@@ -648,9 +655,8 @@ if __name__ == '__main__':
             for t1, t2, col, lw, p_or_t in pranges:
                 if p_or_t == 'Time':
                     utc1, utc2 = 24.*(t1-isun), 24.*(t2-isun)
-                    if utc1 < utc_last and utc2 > ut_start:
-                        print('>>>',utc1,utc2,t1,t2,isun)
-                        ut1  = max(utc1, ut_start)
+                    if utc1 < utc_last and utc2 > utc_first:
+                        ut1  = max(utc1, utc_first)
                         ut2  = min(utc2, utc_last)
                         if ut1 < ut2:
                             plt.plot([ut1,ut2],[y,y],color=cols[col],lw=lw)
