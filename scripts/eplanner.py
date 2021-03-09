@@ -278,6 +278,7 @@ if __name__ == '__main__':
     for sw in swinfo:
         if sw.utc < utc1 and sw.utc+24 < utc2:
             sw.utc += 24.
+        print(utc1,sw.utc,utc2)
 
     # set up general scale, draw vertical dashed lines every minor
     # tick spacing
@@ -307,8 +308,9 @@ if __name__ == '__main__':
     axr.text(utc3, 1.02, str(args.twilight), **kwargs)
     axr.text(utc4, 1.02, str(args.twilight), **kwargs)
 
-    # 1000 points from start to end defined by the Sun at -10.
-    utcs = np.linspace(utc5,utc6,1000)
+    # 600 points from start to end defined by the Sun at -10, i.e.
+    # roughly 1 per minute.
+    utcs = np.linspace(utc5,utc6,600)
     mjds = isun + utcs/24.
     mjds = time.Time(mjds, format='mjd')
 
@@ -500,7 +502,7 @@ if __name__ == '__main__':
         first = True
         for sw in swinfo:
             if first:
-                xstart, ystart = sw.utc,ys[sw.name]
+                xstart, ystart = sw.utc, ys[sw.name]
                 first = False
             else:
                 if sw.name == 'None':
