@@ -278,7 +278,6 @@ if __name__ == '__main__':
     for sw in swinfo:
         if sw.utc < utc1 and sw.utc+24 < utc2:
             sw.utc += 24.
-        print(utc1,sw.utc,utc2)
 
     # set up general scale, draw vertical dashed lines every minor
     # tick spacing
@@ -393,7 +392,7 @@ if __name__ == '__main__':
                 # target has phase or time range info
                 pr = prinfo[key]
                 pranges = pr.prange
-                
+
                 # determine start and stop times of visibility
                 # period. a bit complex because can have targets that
                 # are visible at start and end but not the middle
