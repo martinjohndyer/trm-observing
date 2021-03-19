@@ -284,7 +284,7 @@ def load_ptranges(fname, peinfo):
                         pr.add(line)
 
             except ValueError:
-                print('ValueError found in',line)
+                print('Could not interpret',line.strip(),'as a phase or time range')
                 exit(1)
 
     print('Data on',len(prinfo),'phase ranges loaded.')
