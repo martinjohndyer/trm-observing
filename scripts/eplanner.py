@@ -362,6 +362,11 @@ if __name__ == '__main__':
         alts = altaz.alt.value
         azs = altaz.az.value
         ok = alts > 90.-np.degrees(np.arccos(1./args.airmass))
+        if len(ok[ok]) < 2:
+            # must have some points
+            print(f'reduce: skipping {key} as it is never observable (airmass < {args.airmass}) during the night')
+            skipped_keys.append(key)
+            continue
 
         # Compute minimum distance to the Moon during period target is
         # above airmass limit
@@ -416,7 +421,7 @@ if __name__ == '__main__':
                         # now test whether any phase or time ranges overlap
                         pstart = None
                         for pt1, pt2, col, lw, p_or_t in pranges:
-                            
+
                             if p_or_t == 'Time':
                                 utc1, utc2 = 24.*(pt1-isun), 24.*(pt2-isun)
                                 if utc1 < utc_end and utc2 > utc_start:
@@ -425,7 +430,7 @@ if __name__ == '__main__':
                                     if ut1 < ut2:
                                         # yes, we have overlap
                                         break
-                                    
+
                             elif p_or_t == 'Phase':
                                 # Now the phase info
                                 if pstart is None:
@@ -557,7 +562,7 @@ if __name__ == '__main__':
                 else:
                     utc_end = utc_last = utc
                     mjd_last = mjd
-    
+
             if (not flag or n == len(ok)-1) and not first:
                 first = True
                 if key not in prinfo:
