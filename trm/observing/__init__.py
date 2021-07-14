@@ -37,6 +37,11 @@ SITES = {
         'height' : 2635., 'zhole' : 4.
     },
 
+    'Keck' : {
+        'long' : '-155 28 30.04', 'lat' : '+19 49 34.9', 
+        'height' : 4145., 'zhole' : 4.
+    },
+
     'TNT' : {
         'long' : '+98 28 00', 'lat' : '+18 34 00',
         'height' : 2457., 'zhole' : 2.
