@@ -69,6 +69,15 @@ def iso_datehm(t):
         out.out_subfmt = 'date_hm'
         return out.iso
 
+def sexagesimal(ftime):
+    """
+    Convert time in hours to sexagesimal string
+    """
+    if ftime >= 24.: ftime -= 24
+    hours = int(ftime)
+    minutes = int(60*(ftime-hours))
+    seconds = 3600*(ftime-hours-minutes/60)
+    return f'{hours:02d}:{minutes:02d}:{seconds:04.1f}'
 
 if __name__ == '__main__':
 
@@ -108,6 +117,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '-f', dest='hcopy', default=None,
         help='Name for hard copy file, e.g. plot.pdf, plot.png there will be no interactive plot in this case)')
+
+    parser.add_argument(
+        '-v', dest='verbose', action='store_true',
+        help='Causes verbose output (at the moment just lists UTs corresponding to phase ranges)'
+    )
 
     parser.add_argument(
         '-i', dest='iers', default='',
@@ -434,7 +448,7 @@ if __name__ == '__main__':
                             elif p_or_t == 'Phase':
                                 # Now the phase info
                                 if pstart is None:
-                                    # must compute start and stop phases 
+                                    # must compute start and stop phases
                                     eph = star.eph
                                     times = time.Time((mjd_start,mjd_end))
                                     if eph.time.startswith('H'):
@@ -705,12 +719,19 @@ if __name__ == '__main__':
                         d2 = pend + (p1 - pend) % 1
                         nphs = int(np.ceil(d2 - d1))
                         for n in range(nphs):
-                            ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
-                            ut2  = ut1 + (utc_last-utc_first)/(pend-pstart)*(p2-p1)
+                            st1 = ut1 = utc_first + (utc_last-utc_first)*(d1 + n - pstart)/(pend-pstart)
+                            st2 = ut2  = ut1 + (utc_last-utc_first)/(pend-pstart)*(p2-p1)
                             ut1  = max(ut1, utc_first)
                             ut2  = min(ut2, utc_last)
                             if ut1 < ut2:
                                 plt.plot([ut1,ut2],[y,y],color=cols[col],lw=lw)
+                                if args.verbose:
+                                    delta = 1440.*min(eph.etime((pstart+pend)/2.), eph.coeff[1]/2.)
+                                    print(
+                                        f'Target {key} is at phase range {p1} to {p2} at'
+                                        f' UT {sexagesimal(st1)} to {sexagesimal(st2)} (+/- {delta:.1f} mins), '
+                                        f'[visible range: {sexagesimal(utc_first)} to {sexagesimal(utc_last)}]'
+                                    )
 
             # Compute uncertainty in predictions
             delta = 24.*min(eph.etime((pstart+pend)/2.), eph.coeff[1]/2.)
