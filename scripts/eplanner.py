@@ -617,10 +617,13 @@ if __name__ == '__main__':
         for alt, utc in zip(alts[ok], utcs[ok]):
             if start and alt > 90.-info['zhole']:
                 air_start = utc
-                start = False
-            elif not start and alt < 90.-info['zhole']:
                 air_end = utc
-                break
+                start = False
+            elif not start:
+                if alt > 90.-info['zhole']:
+                    air_end = utc
+                else:
+                    break
 
         if not start:
             plt.fill(
