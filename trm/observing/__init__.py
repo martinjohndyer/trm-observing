@@ -8,7 +8,8 @@ a routine specific to the Thai telescope
 
 import math as m
 import numpy as np
-from trm import subs
+#from trm import subs
+import copy
 
 from astropy import time, coordinates as coord, units as u
 from astropy.coordinates import get_sun, get_moon, EarthLocation, AltAz, SkyCoord
@@ -300,6 +301,160 @@ def load_ptranges(fname, peinfo):
     print('Data on',len(prinfo),'phase ranges loaded.')
     return prinfo
 
+################################################################
+# Below: Vec3, dot and cross are copied from trm.subs
+# They are only used in tnt_alert()
+
+class Vec3(object):
+    """
+    A simple 3D vector class.
+
+    Examples:
+
+    r = Vec3(1,2,3) # sets r = (1,2,3)
+    r = a + b       # adds two Vec3s to make another.
+    x = r[0]        # gets the x ordinate
+    r = 2.*r        # multiply all ordinates by 2
+    print r.norm()  # Print length of a Vec3
+
+    See also dot and cross.
+
+    NB. This does not have many checks, and you should try to get the
+    code right.
+    """
+
+    def __init__(self, *args):
+        """
+        If no arguments supplied, the vector is set to (0,0,0).
+
+        If 3 arguments are supplied, they specify (x,y,z)
+
+        """
+        if len(args) == 0:
+            self.x = self.y = self.z = 0
+        elif len(args) == 3:
+            self.x = args[0]
+            self.y = args[1]
+            self.z = args[2]
+        else:
+            raise ValueError('Vec3(): can only have 0 or 3 arguments')
+
+    def __repr__(self):
+        return '(%f,%f,%f)' % (self.x,self.y,self.z)
+
+    def __iadd__(self, other):
+        self.x += other.x
+        self.y += other.y
+        self.z += other.z
+        return self
+
+    def __add__(self, other):
+        temp = copy.copy(self)
+        temp += other
+        return temp
+
+    def __isub__(self, other):
+        self.x -= other.x
+        self.y -= other.y
+        self.z -= other.z
+        return self
+
+    def __sub__(self, other):
+        temp = copy.copy(self)
+        temp -= other
+        return temp
+
+    def __imul__(self, other):
+        self.x *= other
+        self.y *= other
+        self.z *= other
+        return self
+
+    def __mul__(self, other):
+        temp = copy.copy(self)
+        temp *= other
+        return temp
+
+    def __rmul__(self, other):
+        temp = copy.copy(self)
+        temp *= other
+        return temp
+
+    def __idiv__(self, other):
+        self.x /= other
+        self.y /= other
+        self.z /= other
+        return self
+
+    def __div__(self, other):
+        temp = copy.copy(self)
+        temp /= other
+        return temp
+
+    def __neg__(self):
+        temp = copy.copy(self)
+        temp *= -1
+        return temp
+
+    def __getitem__(self, i):
+        if i == 0:
+            return self.x
+        elif i == 1:
+            return self.y
+        elif i == 2:
+            return self.z
+        else:
+            raise ValueError('Index out of range 0:3')
+
+    def sqnorm(self):
+        """
+        Returns Euclidean length squared of the vector
+        """
+        return self.x**2 + self.y**2 + self.z**2
+
+    def norm(self):
+        """
+        Returns Euclidean length of the vector
+        """
+        return m.sqrt(self.sqnorm())
+
+    def unit(self):
+        """
+        Returns vector as a unit vector in same direction
+        """
+        leng = m.sqrt(self.sqnorm())
+        if leng == 0.:
+            raise ValueError("Vec3.unitv: zero length vector")
+        return self / leng
+
+    def dot(self, other):
+        """
+        Returns the scalar or dot product of self with other, a 3-vector
+        """
+        return self.x*other.x+self.y*other.y+self.z*other.z
+
+    def cross(self, other):
+        """
+        Computes the vector or cross product of self with other, a 3-vector
+        """
+        return Vec3(self.y*other.z-self.z*other.y,
+                    self.z*other.x-self.x*other.z,
+                    self.x*other.y-self.y*other.x)
+
+def dot(a, b):
+    """
+    Computes the scalar or dot product of two 3-vectors
+    """
+    return a.x*b.x+a.y*b.y+a.z*b.z
+
+def cross(a, b):
+    """
+    Computes the vector or cross product of two 3-vectors
+    """
+    return Vec3(a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x)
+
+################################################################
+
 def tnt_alert(alt, az):
     """
     TNT horizon is complicated by the TV mast. This warns
@@ -327,20 +482,21 @@ def tnt_alert(alt, az):
     AZ   = np.radians(np.array([25.,35.5,54.5]))
     calt, salt = np.cos(ALT), np.sin(ALT)
     caz,  saz  = np.cos(AZ), np.sin(AZ)
-    v1  = subs.Vec3(saz[0]*calt[0], caz[0]*calt[0], salt[0])
-    v2  = subs.Vec3(saz[1]*calt[1], caz[1]*calt[1], salt[1])
-    v3  = subs.Vec3(saz[2]*calt[2], caz[2]*calt[2], salt[2])
+    v1  = Vec3(saz[0]*calt[0], caz[0]*calt[0], salt[0])
+    v2  = Vec3(saz[1]*calt[1], caz[1]*calt[1], salt[1])
+    v3  = Vec3(saz[2]*calt[2], caz[2]*calt[2], salt[2])
 
     # a1, a2 defined to be downward pointing axial vectors corresponding to
     # great cirles representing each extreme of the mast. Inside mast if
     # actual vector gives positive dot product with both axial vectors.
-    a1  = subs.cross(v1,v2)
-    a2  = subs.cross(v2,v3)
+    a1  = cross(v1,v2)
+    a2  = cross(v2,v3)
 
     ralt, raz = m.radians(alt), m.radians(az)
-    v = subs.Vec3(m.sin(raz)*m.cos(ralt), m.cos(raz)*m.cos(ralt), m.sin(ralt))
+    v = Vec3(m.sin(raz)*m.cos(ralt), m.cos(raz)*m.cos(ralt), m.sin(ralt))
 
-    return subs.dot(a1,v) > 0 and subs.dot(a2,v) > 0
+    return dot(a1,v) > 0 and dot(a2,v) > 0
+
 
 def load_prefixes(fname, peinfo):
     prefixes = {}
@@ -423,4 +579,3 @@ def sun_at_alt(time1, time2, site, alt, tol=0.05):
             time2 = tmid
 
     return tmid
-
